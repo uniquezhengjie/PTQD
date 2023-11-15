@@ -21,7 +21,7 @@ from quant_scripts.brecq_quant_model import QuantModel
 from quant_scripts.brecq_quant_layer import QuantModule
 from quant_scripts.brecq_adaptive_rounding import AdaRoundQuantizer
 
-n_bits_w = 4
+n_bits_w = 8
 n_bits_a = 8
 
 def load_model_from_config(config, ckpt):
@@ -59,7 +59,8 @@ if __name__ == '__main__':
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    # dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    dataset = DiffusionInputDataset('generated/imagenet_input_100steps_1.0eta.pth')
     data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True) ## each sample is (16,4,32,32)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
@@ -89,7 +90,8 @@ if __name__ == '__main__':
             module.weight_quantizer.soft_targets = False
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
 
-    ckpt = torch.load('quantw{}a{}_ldm_brecq.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
+    # ckpt = torch.load('quantw{}a{}_ldm_brecq.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
+    ckpt = torch.load('generated/quantw{}a{}_ldm_brecq_100s1.0eta.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
     qnn.load_state_dict(ckpt)
     qnn.cuda()
     qnn.eval()
@@ -98,14 +100,18 @@ if __name__ == '__main__':
 
     sampler = DDIMSampler_collectQuantError(fp_model, model)
 
-
+    torch.random.manual_seed(10081)
     classes = torch.randint(0, 1000, size=(1024,))
     n_samples_per_class = 1
 
-    ddim_steps = 20
-    ddim_eta = 0.0
-    scale = 3.0
+    # ddim_steps = 20
+    # ddim_eta = 0.0
+    # scale = 3.0
 
+    ddim_steps = 100
+    ddim_eta = 1.0
+    scale = 1.5
+    save_len = 50
 
     all_samples = list()
 
@@ -115,8 +121,11 @@ if __name__ == '__main__':
                 {model.cond_stage_key: torch.tensor(n_samples_per_class*[1000]).to(model.device)}
                 )
             
-            for class_label in classes:
-                print(f"rendering {n_samples_per_class} examples of class '{class_label}' in {ddim_steps} steps and using s={scale:.2f}.")
+            for idx, class_label in enumerate(classes):
+                # idx = i + 1
+                print(f"rendering {n_samples_per_class} examples of class '{class_label}' in {ddim_steps} steps and using s={scale:.2f}. idx={idx}")
+                if os.path.exists('generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, (idx//save_len + 1)*save_len-1)):
+                    continue
                 xc = torch.tensor(n_samples_per_class*[class_label])
                 c = model.get_learned_conditioning({model.cond_stage_key: xc.to(model.device)})
                 
@@ -128,9 +137,13 @@ if __name__ == '__main__':
                                                 unconditional_guidance_scale=scale,
                                                 unconditional_conditioning=uc, 
                                                 eta=ddim_eta)
+                if (idx+1) % save_len == 0:
+                    import ldm.globalvar as globalvar
+                    data_error_t = globalvar.getList()
+                    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, idx))
+                    globalvar.emptyList()
 
     import ldm.globalvar as globalvar
     data_error_t = globalvar.getList()
-    torch.save(data_error_t, 'data_error_t_w{}a{}_scale{}_eta{}_step{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps))
-
-
+    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, 'final'))
+    globalvar.emptyList()

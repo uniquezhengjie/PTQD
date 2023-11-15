@@ -7,7 +7,7 @@ sys.path.append(".")
 sys.path.append('./taming-transformers')
 import argparse
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1,2,3,4,5,6'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 import time
 import logging
 
@@ -22,8 +22,8 @@ from ldm.models.diffusion.ddim import DDIMSampler, DDIMSampler_quantCorrection_i
 from quant_scripts.brecq_quant_model import QuantModel
 from quant_scripts.brecq_quant_layer import QuantModule
 from quant_scripts.brecq_adaptive_rounding import AdaRoundQuantizer
-
-n_bits_w = 4
+from copy import deepcopy
+n_bits_w = 8
 n_bits_a = 8
 
 def load_model_from_config(config, ckpt):
@@ -57,18 +57,23 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_samples', type=int, default=50000)
     parser.add_argument('--num_classes', type=int, default=1000)
-    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--batch_size', default=4, type=int)
     parser.add_argument('--image_size', default=256, type=int)
     parser.add_argument('--out_dir', default='./generated')
     parser.add_argument("--local_rank", default=os.getenv('LOCAL_RANK', -1), type=int)
     parser.add_argument("--resume", action='store_true')
+    parser.add_argument("--qdecoder", action='store_true')
+    parser.add_argument("--fp32", action='store_true')
     args = parser.parse_args()
     print(args)
     # init ddp
-    local_rank = args.local_rank
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '5696'
+    rank=0
+    local_rank=0
+    # local_rank = args.local_rank
     torch.cuda.set_device(local_rank)
-    dist.init_process_group(backend='nccl')
-    rank = torch.distributed.get_rank()
+    dist.init_process_group(backend='nccl', init_method='env://', rank = 0, world_size = 1)
     ## for debug, not use ddp
     # rank=0
     # local_rank=0
@@ -80,6 +85,10 @@ def main():
     else:
         torch.manual_seed(0 + rank)
 
+    if args.qdecoder:
+        fx_graph_mode_model_file_path = 'quantized_decoder/decoder_fx_graph_mode_quantized.pth'
+        quantized_modelFS = torch.jit.load(fx_graph_mode_model_file_path)
+
     torch.set_grad_enabled(False)
     device = torch.device("cuda", local_rank)
 
@@ -89,6 +98,9 @@ def main():
 
     # Load model:
     model = get_model()
+    if args.fp32:
+        model_fp32 = deepcopy(model)
+        sampler_fp32 = DDIMSampler(model_fp32)
     dmodel = model.model.diffusion_model
     dmodel.cuda()
     dmodel.eval()
@@ -96,7 +108,7 @@ def main():
     from torch.utils.data import DataLoader
 
     dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
-    data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True) ## each sample is (16,4,32,32)
+    data_loader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True) ## each sample is (16,4,32,32)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
     aq_params = {'n_bits': n_bits_a, 'channel_wise': False, 'scale_method': 'mse', 'leaf_param': True}
@@ -131,14 +143,22 @@ def main():
     qnn.cuda()
     qnn.eval()
     setattr(model.model, 'diffusion_model', qnn)
-    sampler = DDIMSampler_quantCorrection_imagenet(model, num_bit=4, correct=True)
+    sampler = DDIMSampler_quantCorrection_imagenet(model, n_bits_w=n_bits_w, n_bits_a=n_bits_a, correct=True)
 
-    out_path = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_0504.npz")
-
+    out_path = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109.npz")
+    print("out_path: ",out_path)
+    if args.qdecoder:
+        out_path_q = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_qdecoder.npz")
+    if args.fp32:
+        out_path_fp32 = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_fp32.npz")
     logging.info("sampling...")
     generated_num = torch.tensor(0, device=device)
     if rank == 0:
         all_images = []
+        if args.qdecoder:
+            all_images_q = []
+        if args.fp32:
+            all_images_fp32 = []
         all_labels = []
         if args.resume:
             if os.path.exists(out_path):
@@ -155,6 +175,23 @@ def main():
 
                 logging.info('successfully resume from the ckpt')
                 logging.info(f'Current number of created samples: {len(all_images) * args.batch_size}')
+            if args.qdecoder:
+                if os.path.exists(out_path_q):
+                    ckpt = np.load(out_path_q)
+                    all_images_q = ckpt['arr_0']
+                    assert all_images_q.shape[0] % args.batch_size == 0, f'Wrong resume checkpoint shape {all_images_q.shape}'
+                    all_images_q = np.split(all_images_q,
+                                        all_images_q.shape[0] // args.batch_size,
+                                        0)
+            if args.fp32:
+                if os.path.exists(out_path_fp32):
+                    ckpt = np.load(out_path_fp32)
+                    all_images_fp32 = ckpt['arr_0']
+                    assert all_images_fp32.shape[0] % args.batch_size == 0, f'Wrong resume checkpoint shape {all_images_fp32.shape}'
+                    all_images_fp32 = np.split(all_images_fp32,
+                                        all_images_fp32.shape[0] // args.batch_size,
+                                        0)
+
         generated_num = torch.tensor(len(all_images) * args.batch_size, device=device)
     dist.barrier()
     dist.broadcast(generated_num, 0)
@@ -164,6 +201,7 @@ def main():
                                      high=args.num_classes,
                                      size=(args.batch_size,),
                                      device=device)
+        print(class_labels)
         uc = model.get_learned_conditioning(
             {model.cond_stage_key: torch.tensor(n_samples_per_class*[1000]).to(model.device)}
             )
@@ -173,6 +211,25 @@ def main():
             xc = torch.tensor(n_samples_per_class*[class_label]).to(model.device)
             c = model.get_learned_conditioning({model.cond_stage_key: xc.to(model.device)})
             
+            if args.fp32:
+                samples_ddim_f32, _ = sampler_fp32.sample(S=ddim_steps,
+                                                conditioning=c,
+                                                batch_size=n_samples_per_class,
+                                                shape=[3, 64, 64],
+                                                verbose=False,
+                                                unconditional_guidance_scale=scale,
+                                                unconditional_conditioning=uc, 
+                                                eta=ddim_eta) 
+                x_samples_ddim_fp32 = model_fp32.decode_first_stage(samples_ddim_f32)
+                x_samples_ddim_fp32 = torch.clamp((x_samples_ddim_fp32+1.0)/2.0, 
+                                            min=0.0, max=1.0)
+                
+                x_samples_ddim_fp32 = (x_samples_ddim_fp32 * 255.).clamp(0, 255).to(torch.uint8)
+                x_samples_ddim_fp32 = x_samples_ddim_fp32.permute(0, 2, 3, 1)
+                samples_fp32 = x_samples_ddim_fp32.contiguous()
+                gathered_samples_fp32 = [torch.zeros_like(samples_fp32) for _ in range(dist.get_world_size())]
+                dist.all_gather(gathered_samples_fp32, samples_fp32)  # gather not supported with NCCL
+
             samples_ddim, _ = sampler.sample(S=ddim_steps,
                                             conditioning=c,
                                             batch_size=n_samples_per_class,
@@ -186,7 +243,7 @@ def main():
             x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, 
                                         min=0.0, max=1.0)
             
-            x_samples_ddim = ((x_samples_ddim + 1) * 127.5).clamp(0, 255).to(torch.uint8)
+            x_samples_ddim = (x_samples_ddim * 255.).clamp(0, 255).to(torch.uint8)
             x_samples_ddim = x_samples_ddim.permute(0, 2, 3, 1)
             samples = x_samples_ddim.contiguous()
 
@@ -196,6 +253,18 @@ def main():
             gathered_samples = [torch.zeros_like(samples) for _ in range(dist.get_world_size())]
             dist.all_gather(gathered_samples, samples)  # gather not supported with NCCL
 
+            if args.qdecoder:
+                x_samples_ddim = quantized_modelFS(samples_ddim.cpu()).cuda()
+                x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, 
+                                            min=0.0, max=1.0)
+                
+                x_samples_ddim = (x_samples_ddim * 255.).clamp(0, 255).to(torch.uint8)
+                x_samples_ddim = x_samples_ddim.permute(0, 2, 3, 1)
+                samples_q = x_samples_ddim.contiguous()
+                
+                gathered_samples_q = [torch.zeros_like(samples_q) for _ in range(dist.get_world_size())]
+                dist.all_gather(gathered_samples_q, samples_q)  # gather not supported with NCCL
+
             gathered_labels = [
                 torch.zeros_like(xc) for _ in range(dist.get_world_size())
             ]
@@ -203,18 +272,32 @@ def main():
 
             if rank == 0:
                 all_images.extend([sample.cpu().numpy() for sample in gathered_samples])
+                if args.qdecoder:
+                    all_images_q.extend([sample.cpu().numpy() for sample in gathered_samples_q])
+                if args.fp32:
+                    all_images_fp32.extend([sample.cpu().numpy() for sample in gathered_samples_fp32])
                 all_labels.extend([labels.cpu().numpy() for labels in gathered_labels])
                 logging.info(f"created {len(all_images) * n_samples_per_class} samples")
                 generated_num = torch.tensor(len(all_images) * n_samples_per_class, device=device)
                 if args.resume:
-                    if generated_num % 1024 == 0:
+                    if generated_num % 32 == 0:
                         arr = np.concatenate(all_images, axis=0)
                         arr = arr[: args.num_samples]
-
+                        if args.qdecoder:
+                            arr_q = np.concatenate(all_images_q, axis=0)
+                            arr_q = arr_q[: args.num_samples]
+                        if args.fp32:
+                            arr_fp32 = np.concatenate(all_images_fp32, axis=0)
+                            arr_fp32 = arr_fp32[: args.num_samples]
                         label_arr = np.concatenate(all_labels, axis=0)
                         label_arr = label_arr[: args.num_samples]
                         logging.info(f"intermediate results saved to {out_path}")
                         np.savez(out_path, arr, label_arr)
+                        if args.qdecoder:
+                            np.savez(out_path_q, arr_q, label_arr)
+                        if args.fp32:
+                            np.savez(out_path_fp32, arr_fp32, label_arr)
+                        logging.info(f"finish saved to {out_path}")
                         del arr
                         del label_arr
             torch.distributed.barrier()
@@ -223,12 +306,21 @@ def main():
     if rank == 0:
         arr = np.concatenate(all_images, axis=0)
         arr = arr[: args.num_samples]
-
+        if args.qdecoder:
+            arr_q = np.concatenate(all_images_q, axis=0)
+            arr_q = arr_q[: args.num_samples]
+        if args.fp32:
+            arr_fp32 = np.concatenate(all_images_fp32, axis=0)
+            arr_fp32 = arr_fp32[: args.num_samples]
         label_arr = np.concatenate(all_labels, axis=0)
         label_arr = label_arr[: args.num_samples]
 
         logging.info(f"saving to {out_path}")
         np.savez(out_path, arr, label_arr)
+        if args.qdecoder:
+            np.savez(out_path_q, arr_q, label_arr)
+        if args.fp32:
+            np.savez(out_path_fp32, arr_fp32, label_arr)
 
     dist.barrier()
     logging.info("sampling complete")

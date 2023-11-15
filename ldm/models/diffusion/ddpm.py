@@ -984,8 +984,9 @@ class LatentDiffusion(DDPM):
             x_recon = fold(o) / normalization
 
         else:
-            # import ldm.globalvar as globalvar
-            # globalvar.appendInput((x_noisy, t, cond['c_crossattn'][0]))
+            import ldm.globalvar as globalvar
+            globalvar.appendInput((x_noisy, t, cond['c_crossattn'][0]))
+            # print('appendInput')
             x_recon = self.model(x_noisy, t, **cond)
 
         if isinstance(x_recon, tuple) and not return_ids:

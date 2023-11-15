@@ -2,7 +2,7 @@ import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 from taming.models import vqgan
 
 import torch
@@ -38,7 +38,8 @@ if __name__ == '__main__':
 
 
     classes = [25, 187, 448, 992]   # define classes to be sampled here
-    n_samples_per_class = 6
+    # n_samples_per_class = 6
+    n_samples_per_class = 3
 
     ddim_steps = 20
     ddim_eta = 1.0
@@ -66,11 +67,11 @@ if __name__ == '__main__':
                                                 unconditional_guidance_scale=scale,
                                                 unconditional_conditioning=uc, 
                                                 eta=ddim_eta)
-
                 x_samples_ddim = model.decode_first_stage(samples_ddim)
                 x_samples_ddim = torch.clamp((x_samples_ddim+1.0)/2.0, 
                                             min=0.0, max=1.0)
                 all_samples.append(x_samples_ddim)
+                print('finish {} class'.format(class_label))
 
     # display as grid
     grid = torch.stack(all_samples, 0)

@@ -114,12 +114,23 @@ class VQModel(pl.LightningModule):
         dec = self.decode(quant_b)
         return dec
 
-    def forward(self, input, return_pred_indices=False):
-        quant, diff, (_,_,ind) = self.encode(input)
-        dec = self.decode(quant)
-        if return_pred_indices:
-            return dec, diff, ind
-        return dec, diff
+    # def forward(self, input, return_pred_indices=False):
+    #     quant, diff, (_,_,ind) = self.encode(input)
+    #     dec = self.decode(quant)
+    #     if return_pred_indices:
+    #         return dec, diff, ind
+    #     return dec, diff
+    
+    def forward(self, input):
+        # quant, diff, (_,_,ind) = self.encode(input)
+        # dec = self.decode(quant)
+        # if return_pred_indices:
+        #     return dec, diff, ind
+        # return dec, diff
+        # input, emb_loss, info = self.quantize(input)
+        quant = self.post_quant_conv(input)
+        dec = self.decoder(quant)
+        return dec
 
     def get_input(self, batch, k):
         x = batch[k]
@@ -265,6 +276,8 @@ class VQModelInterface(VQModel):
     def __init__(self, embed_dim, *args, **kwargs):
         super().__init__(embed_dim=embed_dim, *args, **kwargs)
         self.embed_dim = embed_dim
+        # self.quant = torch.ao.quantization.QuantStub()
+        # self.dequant = torch.ao.quantization.DeQuantStub()
 
     def encode(self, x):
         h = self.encoder(x)
@@ -280,6 +293,19 @@ class VQModelInterface(VQModel):
         quant = self.post_quant_conv(quant)
         dec = self.decoder(quant)
         return dec
+    
+    # def decode(self, h):
+    #     # also go through quantization layer
+    #     # if not force_not_quantize:
+    #     #     quant, emb_loss, info = self.quantize(h)
+    #     # else:
+    #     #     quant = h
+    #     quant = h
+    #     # quant = self.quant(quant)
+    #     quant = self.post_quant_conv(quant)
+    #     dec = self.decoder(quant)
+    #     # dec = self.dequant(dec)
+    #     return dec
 
 
 class AutoencoderKL(pl.LightningModule):

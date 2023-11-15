@@ -377,8 +377,7 @@ class DDIMSampler_collectQuantError(object):
 
             e_t = self.model.apply_model(x, t, c)
             quant_e_t = self.quant_model.apply_model(x, t, c)
-
-            globalvar.append((e_t, quant_e_t - e_t, t))
+            globalvar.append((e_t.cpu(), quant_e_t.cpu() - e_t.cpu(), t.cpu()))
 
         else: ## run here
             x_in = torch.cat([x] * 2)
@@ -390,7 +389,7 @@ class DDIMSampler_collectQuantError(object):
             # globalvar.reset_cur_idx() ## this is for layerwise/blockwise error collection
             quant_e_t_uncond, quant_e_t = self.quant_model.apply_model(x_in, t_in, c_in).chunk(2)
             quant_e_t = quant_e_t_uncond + unconditional_guidance_scale * (quant_e_t - quant_e_t_uncond)
-            globalvar.append((e_t, quant_e_t - e_t, t))
+            globalvar.append((e_t.cpu(), quant_e_t.cpu() - e_t.cpu(), t.cpu()))
             # globalvar.reset_cur_idx()
         
         # if index==0:
@@ -424,16 +423,20 @@ class DDIMSampler_collectQuantError(object):
         return x_prev, pred_x0
 
 class DDIMSampler_quantCorrection_imagenet(object):
-    def __init__(self, model, num_bit, correct=False, schedule="linear", **kwargs):
+    def __init__(self, model, n_bits_w, n_bits_a, correct=False, schedule="linear", **kwargs):
         super().__init__()
         self.model = model
         self.correct  = correct
         self.ddpm_num_timesteps = model.num_timesteps
         self.schedule = schedule
 
-        self.kt_dict = np.load('correct_data/imagenet_20steps_w4a8/kt.npy', allow_pickle=True).item()
-        self.sigmaq_dict = np.load('correct_data/imagenet_20steps_w4a8/t_std_dict.npy', allow_pickle=True).item()
-        self.index_bias = np.load('correct_data/imagenet_20steps_w4a8/idx_bias.npy')
+        # self.kt_dict = np.load('correct_data/imagenet_20steps_w{}a{}/kt.npy'.format(n_bits_w, n_bits_a), allow_pickle=True).item()
+        # self.sigmaq_dict = np.load('correct_data/imagenet_20steps_w{}a{}/t_std_dict.npy'.format(n_bits_w, n_bits_a), allow_pickle=True).item()
+        # self.index_bias = np.load('correct_data/imagenet_20steps_w{}a{}/idx_bias.npy'.format(n_bits_w, n_bits_a))
+
+        self.kt_dict = np.load('correct_data/imagenet_100steps_w{}a{}/kt.npy'.format(n_bits_w, n_bits_a), allow_pickle=True).item()
+        self.sigmaq_dict = np.load('correct_data/imagenet_100steps_w{}a{}/t_std_dict.npy'.format(n_bits_w, n_bits_a), allow_pickle=True).item()
+        self.index_bias = np.load('correct_data/imagenet_100steps_w{}a{}/idx_bias.npy'.format(n_bits_w, n_bits_a))
 
     def kt(self, t):
         if self.correct:

@@ -26,7 +26,7 @@ from quant_scripts.brecq_adaptive_rounding import AdaRoundQuantizer
 
 from tqdm import tqdm
 
-n_bits_w = 4
+n_bits_w = 8
 n_bits_a = 8
 
 def load_model_from_config(config, ckpt):
@@ -84,7 +84,8 @@ if __name__ == '__main__':
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    # dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    dataset = DiffusionInputDataset('generated/imagenet_input_100steps_1.0eta.pth')
     data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
@@ -97,6 +98,8 @@ if __name__ == '__main__':
     qnn.set_first_last_layer_to_8bit()
 
     cali_images, cali_t, cali_y = get_train_samples(data_loader, num_samples=1024)
+    del dataset
+    del data_loader
     device = next(qnn.parameters()).device
     # Initialize weight quantization parameters
     qnn.set_quant_state(True, False)
@@ -106,7 +109,7 @@ if __name__ == '__main__':
         _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
 
     # Kwargs for weight rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, weight=0.01, asym=True,
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=2500, weight=0.01, asym=True,
                     b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=32)
 
     pass_block = 0
@@ -143,7 +146,7 @@ if __name__ == '__main__':
             module.weight_quantizer.soft_targets = False
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
 
-    ckpt = torch.load('quantw4_ldm_brecq.pth', map_location='cpu') ## replace first step checkpoint here
+    ckpt = torch.load('generated/quantw{}_ldm_brecq_100s1.0eta.pth'.format(n_bits_w), map_location='cpu') ## replace first step checkpoint here
     qnn.load_state_dict(ckpt, False)
 
     qnn.set_quant_state(True, True)
@@ -153,7 +156,7 @@ if __name__ == '__main__':
     # does not get involved in further computation
     qnn.disable_network_output_quantization()
     # Kwargs for activation rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=5000, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=16)
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=1250, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=16)
     recon_model(qnn)
     qnn.set_quant_state(weight_quant=True, act_quant=True)
-    torch.save(qnn.state_dict(), 'quantw{}a{}_ldm_brecq.pth'.format(n_bits_w, n_bits_a))
+    torch.save(qnn.state_dict(), 'generated/quantw{}a{}_ldm_brecq_100s1.0eta.pth'.format(n_bits_w, n_bits_a))

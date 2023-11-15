@@ -8,6 +8,8 @@ def appendInput(value):
 def getInputList():
     return diffusion_input_list
 
+def emptyInputList():
+    diffusion_input_list.clear()
 
 ## collect quantization error for correction
 global data_error_t_list
@@ -17,3 +19,6 @@ def append(value):
 
 def getList():
     return data_error_t_list
+
+def emptyList():
+    data_error_t_list.clear()

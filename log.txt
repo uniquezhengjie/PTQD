@@ -1,0 +1,27 @@
+Inception Score: 265.4974365234375
+FID: 9.774169135761497
+sFID: 8.843084307902473
+tcmalloc: large alloc 1482244096 bytes == 0x560386ff4000 @ 
+Precision: 0.9071405440414507
+Recall: 0.3433
+computing fp32 sample batch activations...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████| 579/579 [03:52<00:00,  2.49it/s]
+computing/reading fp32 sample batch statistics...
+Computing fp32 evaluations...
+Inception Score: 281.8531188964844
+FID: 12.491558788318969
+sFID: 8.526299558126766
+tcmalloc: large alloc 1482244096 bytes == 0x560386ff4000 @ 
+Precision: 0.9394160189982729
+Recall: 0.2941
+computing sample batch activations...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████| 579/579 [03:58<00:00,  2.43it/s]
+computing/reading sample batch statistics...
+Computing qdecoder evaluations...
+Inception Score: 256.0870056152344
+FID: 10.21308895119472
+sFID: 11.089691896650038
+tcmalloc: large alloc 1482244096 bytes == 0x560386ff4000 @ 
+Precision: 0.8782113557858376
+Recall: 0.3375
+

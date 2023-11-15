@@ -1,0 +1,1 @@
+https://docs.openvino.ai/2023.1/notebooks/228-clip-zero-shot-convert-with-output.html

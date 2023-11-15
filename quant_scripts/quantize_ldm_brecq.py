@@ -25,7 +25,7 @@ from quant_scripts.brecq_block_recon import block_reconstruction_single_input, b
 
 from tqdm import tqdm
 
-n_bits_w = 4
+n_bits_w = 8
 n_bits_a = 8
 
 def load_model_from_config(config, ckpt):
@@ -80,11 +80,6 @@ if __name__ == '__main__':
     model = model.model.diffusion_model
     model.cuda()
     model.eval()
-    from quant_scripts.quant_dataset import DiffusionInputDataset
-    from torch.utils.data import DataLoader
-
-    dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
-    data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
     aq_params = {'n_bits': n_bits_a, 'channel_wise': False, 'scale_method': 'mse', 'leaf_param': True}
@@ -95,8 +90,18 @@ if __name__ == '__main__':
     print('Setting the first and the last layer to 8-bit')
     qnn.set_first_last_layer_to_8bit()
 
-    cali_images, cali_t, cali_y = get_train_samples(data_loader, num_samples=1024)
     device = next(qnn.parameters()).device
+
+    from quant_scripts.quant_dataset import DiffusionInputDataset
+    from torch.utils.data import DataLoader
+
+    # dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    dataset = DiffusionInputDataset('generated/imagenet_input_100steps_1.0eta.pth')
+    data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True)
+    
+    cali_images, cali_t, cali_y = get_train_samples(data_loader, num_samples=1024)
+    del dataset
+    del data_loader
     # Initialize weight quantization parameters
     qnn.set_quant_state(True, False)
 
@@ -105,7 +110,7 @@ if __name__ == '__main__':
         _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
 
     # Kwargs for weight rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, weight=0.01, asym=True,
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=2500, weight=0.01, asym=True,
                     b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=8)
 
     pass_block = 0
@@ -140,4 +145,4 @@ if __name__ == '__main__':
     print('Start calibration')
     recon_model(qnn)
     qnn.set_quant_state(weight_quant=True, act_quant=False)
-    torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq.pth'.format(n_bits_w))
+    torch.save(qnn.state_dict(), 'generated/quantw{}_ldm_brecq_100s1.0eta.pth'.format(n_bits_w))

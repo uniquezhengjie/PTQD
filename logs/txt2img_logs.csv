@@ -1,0 +1,5 @@
+prompt,outdir,skip_grid,skip_save,ddim_steps,fixed_code,ddim_eta,n_iter,H,W,C,f,n_samples,n_rows,scale,device,from_file,seed,unet_bs,turbo,precision,format,sampler,ckpt
+a dog under the tree,outputs/txt2img-samples,False,False,50,False,0.0,1,512,512,4,8,1,0,7.5,cuda,,484697,1,False,autocast,png,plms,/home/reexen/projects/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt
+a dog under the tree,outputs/txt2img-samples,False,False,50,False,0.0,1,512,512,4,8,1,0,7.5,cuda,,484697,1,False,autocast,png,plms,/home/reexen/projects/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt
+a dog under the tree,outputs/txt2img-samples,False,False,50,False,0.0,1,512,512,4,8,1,0,7.5,cuda,,484697,1,False,autocast,png,plms,/home/reexen/projects/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt
+a dog under the tree,outputs/txt2img-samples,False,False,50,False,0.0,1,512,512,4,8,1,0,7.5,cuda,,484697,1,False,autocast,png,plms,/home/reexen/projects/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt
