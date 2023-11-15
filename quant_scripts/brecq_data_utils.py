@@ -18,7 +18,8 @@ def save_inp_oup_data(model: QuantModel, layer, cali_images, cali_t, cali_y,
     :param keep_gpu: put saved data on GPU for faster optimization
     :return: input and output data
     """
-    device = next(model.parameters()).device
+    # device = next(model.parameters()).device
+    device = 'cuda'
     get_inp_out = GetLayerInpOut(model, layer, device=device, asym=asym, act_quant=act_quant)
     cached_batches = []
     torch.cuda.empty_cache()
@@ -49,7 +50,8 @@ def save_inp_oup_data_block(model: QuantModel, layer: QuantModule, cali_images, 
     :param keep_gpu: put saved data on GPU for faster optimization
     :return: input and output data
     """
-    device = next(model.parameters()).device
+    # device = next(model.parameters()).device
+    device = 'cuda'
     get_inp_out = GetBlockInpOut(model, layer, device=device, asym=asym, act_quant=act_quant)
     cached_batches = []
     torch.cuda.empty_cache()
@@ -84,7 +86,8 @@ def save_grad_data(model: QuantModel, layer: QuantModule, cali_images, cali_t, c
     :param keep_gpu: put saved data on GPU for faster optimization
     :return: gradient data
     """
-    device = next(model.parameters()).device
+    # device = next(model.parameters()).device
+    device = 'cuda'
     get_grad = GetLayerGrad(model, layer, device, act_quant=act_quant)
     cached_batches = []
     torch.cuda.empty_cache()

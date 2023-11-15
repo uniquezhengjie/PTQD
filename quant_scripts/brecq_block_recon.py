@@ -73,34 +73,32 @@ def block_reconstruction_two_input(model: QuantModel, block, cali_images:torch.T
 
     # Save data before optimizing the rounding
     # print(batch_size,cali_images.shape,cali_t.shape,cali_y.shape)
-    for s in [256,512,768,1024]:
-        cached_inps0, cached_inps1, cached_outs = save_inp_oup_data_block(model, block, cali_images[s-256:s], cali_t[s-256:s], cali_y[s-256:s], asym, act_quant, batch_size)
-        # cached_inps0, cached_inps1, cached_outs = save_inp_oup_data_block(model, block, cali_images, cali_t, cali_y, asym, act_quant, batch_size)
-        if opt_mode != 'mse':
-            cached_grads = save_grad_data(model, block, cali_images, cali_t, cali_y, act_quant, batch_size=batch_size)
-        else:
-            cached_grads = None
-        device = 'cuda'
-        for i in range(iters):
-            idx = torch.randperm(cached_inps0.size(0))[:batch_size]
-            cur_inp0 = cached_inps0[idx].to(device)
-            cur_inp1 = cached_inps1[idx].to(device)
-            cur_out = cached_outs[idx].to(device)
-            cur_grad = cached_grads[idx].to(device) if opt_mode != 'mse' else None
+    cached_inps0, cached_inps1, cached_outs = save_inp_oup_data_block(model, block, cali_images, cali_t, cali_y, asym, act_quant, batch_size)
+    if opt_mode != 'mse':
+        cached_grads = save_grad_data(model, block, cali_images, cali_t, cali_y, act_quant, batch_size=batch_size)
+    else:
+        cached_grads = None
+    device = 'cuda'
+    for i in range(iters):
+        idx = torch.randperm(cached_inps0.size(0))[:batch_size]
+        cur_inp0 = cached_inps0[idx].to(device)
+        cur_inp1 = cached_inps1[idx].to(device)
+        cur_out = cached_outs[idx].to(device)
+        cur_grad = cached_grads[idx].to(device) if opt_mode != 'mse' else None
 
-            optimizer.zero_grad()
-            out_quant = block(cur_inp0, cur_inp1)
+        optimizer.zero_grad()
+        out_quant = block(cur_inp0, cur_inp1)
 
-            err = loss_func(out_quant, cur_out, cur_grad)
-            err.backward(retain_graph=True)
-            if multi_gpu:
-                for p in opt_params:
-                    link.allreduce(p.grad)
-            optimizer.step()
-            if scheduler:
-                scheduler.step()
+        err = loss_func(out_quant, cur_out, cur_grad)
+        err.backward(retain_graph=True)
+        if multi_gpu:
+            for p in opt_params:
+                link.allreduce(p.grad)
+        optimizer.step()
+        if scheduler:
+            scheduler.step()
 
-        torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
 
     # Finish optimization, use hard rounding.
     for name, module in block.named_modules():
@@ -182,33 +180,31 @@ def block_reconstruction_single_input(model: QuantModel, block, cali_images:torc
                              b_range=b_range, decay_start=0, warmup=warmup, p=p)
 
     # Save data before optimizing the rounding
-    for s in [256,512,768,1024]:
-        cached_inps, cached_outs = save_inp_oup_data(model, block, cali_images[s-256:s], cali_t[s-256:s], cali_y[s-256:s], asym, act_quant, batch_size)
-        # cached_inps, cached_outs = save_inp_oup_data(model, block, cali_images, cali_t, cali_y, asym, act_quant, batch_size)
-        if opt_mode != 'mse':
-            cached_grads = save_grad_data(model, block, cali_images, cali_t, cali_y, act_quant, batch_size=batch_size)
-        else:
-            cached_grads = None
-        device = 'cuda'
-        for i in range(iters):
-            idx = torch.randperm(cached_inps.size(0))[:batch_size]
-            cur_inp = cached_inps[idx].to(device)
-            cur_out = cached_outs[idx].to(device)
-            cur_grad = cached_grads[idx].to(device) if opt_mode != 'mse' else None
+    cached_inps, cached_outs = save_inp_oup_data(model, block, cali_images, cali_t, cali_y, asym, act_quant, batch_size)
+    if opt_mode != 'mse':
+        cached_grads = save_grad_data(model, block, cali_images, cali_t, cali_y, act_quant, batch_size=batch_size)
+    else:
+        cached_grads = None
+    device = 'cuda'
+    for i in range(iters):
+        idx = torch.randperm(cached_inps.size(0))[:batch_size]
+        cur_inp = cached_inps[idx].to(device)
+        cur_out = cached_outs[idx].to(device)
+        cur_grad = cached_grads[idx].to(device) if opt_mode != 'mse' else None
 
-            optimizer.zero_grad()
-            out_quant = block(cur_inp)
+        optimizer.zero_grad()
+        out_quant = block(cur_inp)
 
-            err = loss_func(out_quant, cur_out, cur_grad)
-            err.backward(retain_graph=True)
-            if multi_gpu:
-                for p in opt_params:
-                    link.allreduce(p.grad)
-            optimizer.step()
-            if scheduler:
-                scheduler.step()
+        err = loss_func(out_quant, cur_out, cur_grad)
+        err.backward(retain_graph=True)
+        if multi_gpu:
+            for p in opt_params:
+                link.allreduce(p.grad)
+        optimizer.step()
+        if scheduler:
+            scheduler.step()
 
-        torch.cuda.empty_cache()
+    torch.cuda.empty_cache()
 
     # Finish optimization, use hard rounding.
     for name, module in block.named_modules():

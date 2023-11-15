@@ -96,7 +96,7 @@ def layer_reconstruction(model: QuantModel, layer: QuantModule, cali_images:torc
     device = 'cuda'
     # device = next(model.parameters()).device
     for i in range(iters):
-        idx = torch.randperm(240)[:batch_size]
+        idx = torch.randperm(960)[:batch_size]
 
         cur_inp = cached_inps[idx].to(device)
         cur_out = cached_outs[idx].to(device)
