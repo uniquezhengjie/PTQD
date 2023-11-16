@@ -82,7 +82,7 @@ if __name__ == '__main__':
     model = model.model.diffusion_model
     model.cuda()
     model.eval()
-    batch_size = 8
+    batch_size = 4
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
     aq_params = {'n_bits': n_bits_a, 'channel_wise': False, 'scale_method': 'mse', 'leaf_param': True}
