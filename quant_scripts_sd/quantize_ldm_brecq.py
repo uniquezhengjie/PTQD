@@ -129,11 +129,12 @@ if __name__ == '__main__':
     if ignore_count == layer_len:
         sys.exit(0)
 
-    print('load_state_dict layer', ignore_count)
-    ckpt = torch.load('quantw8_ldm_brecq_sd_{}.pth'.format(str(ignore_count)), map_location='cpu') ## replace first step checkpoint here
-    qnn.load_state_dict(ckpt, False)
-    qnn.set_quant_state(True, False)
-    del ckpt
+    if exist_idx != 0:
+        print('load_state_dict layer', ignore_count)
+        ckpt = torch.load('quantw8_ldm_brecq_sd_{}.pth'.format(str(ignore_count)), map_location='cpu') ## replace first step checkpoint here
+        qnn.load_state_dict(ckpt, False)
+        qnn.set_quant_state(True, False)
+        del ckpt
 
     pass_block = 0
     qlayer_count = 0
