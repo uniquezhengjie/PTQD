@@ -93,6 +93,7 @@ def count_recon_times(model):
             count_recon_times(module)
 
 def main(rank, world_size):
+    print('rank: ', rank)
     ddp_setup(rank, world_size)
     model = get_model()
     model = model.model.diffusion_model
@@ -105,7 +106,7 @@ def main(rank, world_size):
     qnn = QuantModel(model=model, weight_quant_params=wq_params, act_quant_params=aq_params)
     qnn.cuda()
     qnn.eval()
-    DDP(qnn, device_ids=[1,3,4,5])
+    DDP(qnn, device_ids=1)
 
     print('Setting the first and the last layer to 8-bit')
     qnn.set_first_last_layer_to_8bit()
