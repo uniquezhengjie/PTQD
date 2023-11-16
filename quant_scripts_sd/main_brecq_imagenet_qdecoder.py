@@ -95,7 +95,7 @@ if __name__ == '__main__':
             module.weight_quantizer.soft_targets = False
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
 
-    ckpt = torch.load('quantw{}a{}_ldm_brecq.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
+    ckpt = torch.load('quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
     qnn.load_state_dict(ckpt)
     qnn.cuda()
     qnn.eval()

@@ -2,7 +2,7 @@ import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 from taming.models import vqgan
 
 import torch
@@ -81,11 +81,12 @@ if __name__ == '__main__':
     model = model.model.diffusion_model
     model.cuda()
     model.eval()
+    batch_size = 8
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps_sd.pth')
-    data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
+    dataset = DiffusionInputDataset('imagenet_input_50steps_sd.pth')
+    data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
     aq_params = {'n_bits': n_bits_a, 'channel_wise': False, 'scale_method': 'mse', 'leaf_param': True}
@@ -103,11 +104,11 @@ if __name__ == '__main__':
 
     print('First run to init model...')
     with torch.no_grad():
-        _ = qnn(cali_images[:1].to(device),cali_t[:1].to(device),cali_y[:1].to(device))
+        _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
 
     # Kwargs for weight rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=50000, weight=0.01, asym=True,
-                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=1)
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, weight=0.01, asym=True,
+                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size*4)
 
     pass_block = 0
     def recon_model(model: nn.Module):
@@ -153,7 +154,7 @@ if __name__ == '__main__':
     # does not get involved in further computation
     qnn.disable_network_output_quantization()
     # Kwargs for activation rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=25000, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=1)
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=5000, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=batch_size*2)
     recon_model(qnn)
     qnn.set_quant_state(weight_quant=True, act_quant=True)
     torch.save(qnn.state_dict(), 'quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a))

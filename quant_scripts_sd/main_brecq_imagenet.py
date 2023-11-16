@@ -21,6 +21,8 @@ from torchvision.utils import make_grid
 from quant_scripts.brecq_quant_model import QuantModel
 from quant_scripts.brecq_quant_layer import QuantModule
 from quant_scripts.brecq_adaptive_rounding import AdaRoundQuantizer
+from imagenet_2012_labels import label_to_name
+
 n_bits_w = 8
 n_bits_a = 8
 
@@ -58,7 +60,7 @@ if __name__ == '__main__':
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    dataset = DiffusionInputDataset('imagenet_input_50steps_sd.pth')
     data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True) 
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
@@ -92,7 +94,7 @@ if __name__ == '__main__':
             module.weight_quantizer.soft_targets = False
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
 
-    ckpt = torch.load('quantw{}a{}_ldm_brecq.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
+    ckpt = torch.load('quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
     qnn.load_state_dict(ckpt)
     qnn.cuda()
     qnn.eval()
@@ -105,29 +107,30 @@ if __name__ == '__main__':
     n_samples_per_class = 6
 
     ## Quality, sampling speed and diversity are best controlled via the `scale`, `ddim_steps` and `ddim_eta` variables
-    ddim_steps = 20
+    ddim_steps = 50
     ddim_eta = 0.0
-    scale = 3.0   # for  guidance
+    scale = 7.5
 
+    datasets = []
+    for c in classes:
+        name = label_to_name(c).split(',')[0]
+        datasets.append("This is a photo of a {}".format(name))
 
     all_samples = list()
 
     with torch.no_grad():
         with model.ema_scope():
-            uc = model.get_learned_conditioning(
-                {model.cond_stage_key: torch.tensor(n_samples_per_class*[1000]).to(model.device)}
-                )
+            uc = model.get_learned_conditioning(n_samples_per_class * [""])
             
-            for class_label in classes:
+            for class_label in datasets:
                 t0 = time.time()
                 print(f"rendering {n_samples_per_class} examples of class '{class_label}' in {ddim_steps} steps and using s={scale:.2f}.")
-                xc = torch.tensor(n_samples_per_class*[class_label])
-                c = model.get_learned_conditioning({model.cond_stage_key: xc.to(model.device)})
+                c = model.get_learned_conditioning(n_samples_per_class*[class_label])
                 
                 samples_ddim, _ = sampler.sample(S=ddim_steps,
                                                 conditioning=c,
                                                 batch_size=n_samples_per_class,
-                                                shape=[3, 64, 64],
+                                                shape=[4, 64, 64],
                                                 verbose=False,
                                                 unconditional_guidance_scale=scale,
                                                 unconditional_conditioning=uc, 

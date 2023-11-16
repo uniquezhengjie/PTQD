@@ -19,7 +19,7 @@ from imagenet_2012_labels import label_to_name
 
 def load_model_from_config(config, ckpt):
     print(f"Loading model from {ckpt}")
-    pl_sd = torch.load(ckpt)#, map_location="cpu")
+    pl_sd = torch.load(ckpt, map_location="cpu")
     sd = pl_sd["state_dict"]
     model = instantiate_from_config(config.model)
     m, u = model.load_state_dict(sd, strict=False)
@@ -29,8 +29,8 @@ def load_model_from_config(config, ckpt):
 
 
 def get_model():
-    config = OmegaConf.load("configs/stable-diffusion/v1-inference.yaml")  
-    model = load_model_from_config(config, "models/ldm/stable-diffusion-v1/model.ckpt")
+    config = OmegaConf.load("configs/latent-diffusion/cin256-v2.yaml")  
+    model = load_model_from_config(config, "models/ldm/cin256-v2/model.ckpt")
     return model
 
 if __name__ == '__main__':
@@ -38,8 +38,8 @@ if __name__ == '__main__':
     sampler = DDIMSampler(model)
 
     classes = [25, 187, 448, 992]   # define classes to be sampled here
-    # n_samples_per_class = 6
-    n_samples_per_class = 1
+    n_samples_per_class = 6
+    # n_samples_per_class = 1
 
     ddim_steps = 50
     ddim_eta = 0.0

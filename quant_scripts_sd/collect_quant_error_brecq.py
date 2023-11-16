@@ -3,7 +3,7 @@ sys.path.append(".")
 sys.path.append('./taming-transformers')
 from taming.models import vqgan
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 
 import torch
 import torch.nn as nn
@@ -36,8 +36,8 @@ def load_model_from_config(config, ckpt):
 
 
 def get_model():
-    config = OmegaConf.load("configs/latent-diffusion/cin256-v2.yaml")  
-    model = load_model_from_config(config, "models/ldm/cin256-v2/model.ckpt")
+    config = OmegaConf.load("configs/stable-diffusion/v1-inference.yaml")  
+    model = load_model_from_config(config, "models/ldm/stable-diffusion-v1/model.ckpt")
     return model
 
 def get_train_samples(train_loader, num_samples):
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    dataset = DiffusionInputDataset('imagenet_input_50steps_sd.pth')
     data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True) ## each sample is (16,4,32,32)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
@@ -89,7 +89,7 @@ if __name__ == '__main__':
             module.weight_quantizer.soft_targets = False
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
 
-    ckpt = torch.load('quantw{}a{}_ldm_brecq.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
+    ckpt = torch.load('quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
     qnn.load_state_dict(ckpt)
     qnn.cuda()
     qnn.eval()
@@ -99,12 +99,12 @@ if __name__ == '__main__':
     sampler = DDIMSampler_collectQuantError(fp_model, model)
 
 
-    classes = torch.randint(0, 100, size=(128,))
+    classes = torch.randint(0, 1000, size=(1024,))
     n_samples_per_class = 1
 
-    ddim_steps = 20
+    ddim_steps = 50
     ddim_eta = 0.0
-    scale = 3.0
+    scale = 7.5
 
 
     all_samples = list()
@@ -123,7 +123,7 @@ if __name__ == '__main__':
                 samples_ddim, _ = sampler.sample(S=ddim_steps,
                                                 conditioning=c,
                                                 batch_size=n_samples_per_class,
-                                                shape=[3, 64, 64],
+                                                shape=[4, 64, 64],
                                                 verbose=False,
                                                 unconditional_guidance_scale=scale,
                                                 unconditional_conditioning=uc, 
@@ -131,6 +131,6 @@ if __name__ == '__main__':
 
     import ldm.globalvar as globalvar
     data_error_t = globalvar.getList()
-    torch.save(data_error_t, 'data_error_t_w{}a{}_scale{}_eta{}_step{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps))
+    torch.save(data_error_t, 'data_error_t_w{}a{}_scale{}_eta{}_step{}_sd.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps))
 
 

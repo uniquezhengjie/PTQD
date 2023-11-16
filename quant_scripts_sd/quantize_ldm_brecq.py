@@ -2,7 +2,7 @@ import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 from taming.models import vqgan
 
 import torch
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps_sd.pth')
+    dataset = DiffusionInputDataset('imagenet_input_50steps_sd.pth')
     data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
     
     cali_images, cali_t, cali_y = get_train_samples(data_loader, num_samples=1024)
@@ -108,33 +108,38 @@ if __name__ == '__main__':
         _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
 
     # Kwargs for weight rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=50000, weight=0.01, asym=True,
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, weight=0.01, asym=True,
                     b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size)
 
     pass_block = 0
+    qlayer_count = 0
     def recon_model(model: nn.Module):
         """
         Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
         """
         global pass_block
+        global qlayer_count
         for name, module in model.named_children():
             if isinstance(module, (QuantModule)):
                 if module.ignore_reconstruction is True:
                     print('Ignore reconstruction of layer {}'.format(name))
                     continue
                 else:
-                    print('Reconstruction for layer {}'.format(name))
+                    qlayer_count += 1
+                    print('Reconstruction for layer {}'.format(name), qlayer_count)
                     layer_reconstruction(qnn, module, **kwargs)
 
             elif isinstance(module, ResBlock):
                 pass_block -= 1
                 if pass_block < 0 :
-                    print('Reconstruction for ResBlock {}'.format(name))
+                    qlayer_count += 1
+                    print('Reconstruction for ResBlock {}'.format(name), qlayer_count)
                     block_reconstruction_two_input(qnn, module, **kwargs)
             elif isinstance(module, BasicTransformerBlock):
                 pass_block -= 1
                 if pass_block < 0 :
-                    print('Reconstruction for BasicTransformerBlock {}'.format(name))
+                    qlayer_count += 1
+                    print('Reconstruction for BasicTransformerBlock {}'.format(name), qlayer_count)
                     block_reconstruction_two_input(qnn, module, **kwargs)
             else:
                 recon_model(module)

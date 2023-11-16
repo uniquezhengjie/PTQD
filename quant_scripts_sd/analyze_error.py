@@ -7,7 +7,7 @@ import os
 
 n_bits_w = 8
 n_bits_a = 8
-save_dir = 'correct_data/imagenet_20steps_w{}a{}'.format(n_bits_w, n_bits_a)
+save_dir = 'correct_data/imagenet_50steps_w{}a{}_sd'.format(n_bits_w, n_bits_a)
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
@@ -33,7 +33,7 @@ def calculate_t_channel_error(t_tensor, error_tensor):
             bias_table[i].append(result_list[t_set.index(idx)])
             
     bias_arr = np.array(bias_table)
-    np.save('correct_data/imagenet_20steps_w{}a{}/idx_bias.npy'.format(n_bits_w, n_bits_a), bias_arr)
+    np.save('correct_data/imagenet_50steps_w{}a{}_sd/idx_bias.npy'.format(n_bits_w, n_bits_a), bias_arr)
     print(bias_table)
 
 
@@ -62,13 +62,13 @@ def get_kt_dict_imagenet(data_tensor, error_tensor, t_tensor):
     
     # print('r_value: ', r_value)
     print(kt_dict)
-    np.save('correct_data/imagenet_20steps_w{}a{}/kt.npy'.format(n_bits_w, n_bits_a), kt_dict, allow_pickle=True)
+    np.save('correct_data/imagenet_50steps_w{}a{}_sd/kt.npy'.format(n_bits_w, n_bits_a), kt_dict, allow_pickle=True)
 
 def get_t_residualerror_std_dict(t_tensor, data_tensor, error_tensor):
     '''
         need kt first for calculating residual error
     '''
-    kt_dict = np.load('correct_data/imagenet_20steps_w{}a{}/kt.npy'.format(n_bits_w, n_bits_a), allow_pickle=True).item()
+    kt_dict = np.load('correct_data/imagenet_50steps_w{}a{}_sd/kt.npy'.format(n_bits_w, n_bits_a), allow_pickle=True).item()
     t_std_dict = {}
     for i in range(len(t_tensor)):
         int_t = t_tensor[i].item()
@@ -89,11 +89,14 @@ def get_t_residualerror_std_dict(t_tensor, data_tensor, error_tensor):
         t_std_dict[k] = sum(t_std_dict[k]) / len(t_std_dict[k])
     print(t_std_dict)
     
-    np.save("correct_data/imagenet_20steps_w{}a{}/t_std_dict.npy".format(n_bits_w, n_bits_a), t_std_dict, allow_pickle=True)
+    np.save("correct_data/imagenet_50steps_w{}a{}_sd/t_std_dict.npy".format(n_bits_w, n_bits_a), t_std_dict, allow_pickle=True)
 
 
 if __name__ == '__main__':
-    data_error_t_list = torch.load('data_error_t_w{}a{}_scale3.0_eta0.0_step20.pth'.format(n_bits_w, n_bits_a), map_location='cpu')  ## replace error file here
+    ddim_steps = 50
+    ddim_eta = 0.0
+    scale = 7.5
+    data_error_t_list = torch.load('data_error_t_w{}a{}_scale{}_eta{}_step{}_sd.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps), map_location='cpu')  ## replace error file here
     data_list = []
     error_list = [] 
     t_list = []
