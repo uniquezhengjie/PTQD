@@ -95,7 +95,7 @@ def count_recon_times(model):
         else:
             count_recon_times(module)
 
-def recon_model(model, ignore_count, kwargs):
+def recon_model(model, ignore_count, gpu_id, kwargs):
     """
     Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
     """
@@ -136,7 +136,7 @@ def recon_model(model, ignore_count, kwargs):
                 block_reconstruction_two_input(model, module, **kwargs)
         else:
             recon_model(module)
-        if qlayer_count % 10 == 0 and qlayer_count > exist_idx:
+        if qlayer_count % 10 == 0 and qlayer_count > exist_idx and gpu_id == 0:
             if qlayer_count == 0:
                 continue
             if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count)):
@@ -145,9 +145,11 @@ def recon_model(model, ignore_count, kwargs):
             torch.save(model.state_dict(), 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
             if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20)):
                 os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20))
-    model.set_quant_state(weight_quant=True, act_quant=False)
-    torch.save(model.state_dict(), 'quantw{}_ldm_brecq_sd.pth'.format(n_bits_w))
-    destroy_process_group()
+
+    if gpu_id == 0:
+        model.set_quant_state(weight_quant=True, act_quant=False)
+        torch.save(model.state_dict(), 'quantw{}_ldm_brecq_sd.pth'.format(n_bits_w))
+        destroy_process_group()
 
 class Trainer:
     def __init__(
@@ -164,7 +166,7 @@ class Trainer:
         self.kwargs = kwargs
 
     def train(self):
-        recon_model(self.model, self.ignore_count, self.kwargs)
+        recon_model(self.model, self.ignore_count, self.gpu_id, self.kwargs)
 
 
 def main(rank, world_size):
