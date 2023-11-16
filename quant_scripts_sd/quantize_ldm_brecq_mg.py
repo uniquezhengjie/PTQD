@@ -27,12 +27,15 @@ import torch.multiprocessing as mp
 from torch.utils.data.distributed import DistributedSampler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed import init_process_group, destroy_process_group
+from torch.utils.data import Dataset, DataLoader
 
 from tqdm import tqdm
 import copy
 
 n_bits_w = 8
 n_bits_a = 8
+pass_block = 0
+qlayer_count = 0
 
 def ddp_setup(rank: int, world_size: int):
     """
@@ -92,6 +95,78 @@ def count_recon_times(model):
         else:
             count_recon_times(module)
 
+def recon_model(model, ignore_count, kwargs):
+    """
+    Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
+    """
+    exist_idx = copy.deepcopy(ignore_count)
+    
+    global pass_block
+    global qlayer_count
+    for name, module in model.named_children():
+        if isinstance(module, (QuantModule)):
+            if module.ignore_reconstruction is True:
+                print('Ignore reconstruction of layer {}'.format(name))
+                continue
+            else:
+                qlayer_count = 1
+                print('Reconstruction for layer {}'.format(name), qlayer_count)
+                if ignore_count > 0:
+                    ignore_count -= 1
+                    continue
+                layer_reconstruction(model, module, **kwargs)
+
+        elif isinstance(module, ResBlock):
+            pass_block -= 1
+            if pass_block < 0 :
+                qlayer_count = 1
+                print('Reconstruction for ResBlock {}'.format(name), qlayer_count)
+                if ignore_count > 0:
+                    ignore_count -= 1
+                    continue
+                block_reconstruction_two_input(model, module, **kwargs)
+        elif isinstance(module, BasicTransformerBlock):
+            pass_block -= 1
+            if pass_block < 0 :
+                qlayer_count = 1
+                print('Reconstruction for BasicTransformerBlock {}'.format(name), qlayer_count)
+                if ignore_count > 0:
+                    ignore_count -= 1
+                    continue
+                block_reconstruction_two_input(model, module, **kwargs)
+        else:
+            recon_model(module)
+        if qlayer_count % 10 == 0 and qlayer_count > exist_idx:
+            if qlayer_count == 0:
+                continue
+            if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count)):
+                continue
+            model.set_quant_state(weight_quant=True, act_quant=False)
+            torch.save(model.state_dict(), 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
+            if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20)):
+                os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20))
+    model.set_quant_state(weight_quant=True, act_quant=False)
+    torch.save(model.state_dict(), 'quantw{}_ldm_brecq_sd.pth'.format(n_bits_w))
+    destroy_process_group()
+
+class Trainer:
+    def __init__(
+        self,
+        model,
+        gpu_id,
+        ignore_count,
+        kwargs
+    ) -> None:
+        self.gpu_id = gpu_id
+        self.model = model.to(gpu_id)
+        self.model = DDP(model, device_ids=[gpu_id])
+        self.ignore_count = ignore_count
+        self.kwargs = kwargs
+
+    def train(self):
+        recon_model(self.model, self.ignore_count, self.kwargs)
+
+
 def main(rank, world_size):
     print('rank: ', rank)
     ddp_setup(rank, world_size)
@@ -106,7 +181,7 @@ def main(rank, world_size):
     qnn = QuantModel(model=model, weight_quant_params=wq_params, act_quant_params=aq_params)
     qnn.cuda()
     qnn.eval()
-    DDP(qnn, device_ids=1)
+    DDP(qnn, device_ids=[0])
 
     print('Setting the first and the last layer to 8-bit')
     qnn.set_first_last_layer_to_8bit()
@@ -117,8 +192,8 @@ def main(rank, world_size):
     from torch.utils.data import DataLoader
 
     dataset = DiffusionInputDataset('imagenet_input_50steps_sd.pth')
-    # data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
-    data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(dataset))
+    data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
+    # data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=False, sampler=DistributedSampler(dataset))
     
     cali_images, cali_t, cali_y = get_train_samples(data_loader, num_samples=1024)
     # Initialize weight quantization parameters
@@ -154,65 +229,13 @@ def main(rank, world_size):
         qnn.load_state_dict(ckpt, False)
         qnn.set_quant_state(True, False)
         del ckpt
-
-    pass_block = 0
-    qlayer_count = 0
-    def recon_model(model: nn.Module):
-        """
-        Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
-        """
-        global pass_block
-        global ignore_count
-        global qlayer_count
-        for name, module in model.named_children():
-            if isinstance(module, (QuantModule)):
-                if module.ignore_reconstruction is True:
-                    print('Ignore reconstruction of layer {}'.format(name))
-                    continue
-                else:
-                    qlayer_count = 1
-                    print('Reconstruction for layer {}'.format(name), qlayer_count)
-                    if ignore_count > 0:
-                        ignore_count -= 1
-                        continue
-                    layer_reconstruction(qnn, module, **kwargs)
-
-            elif isinstance(module, ResBlock):
-                pass_block -= 1
-                if pass_block < 0 :
-                    qlayer_count = 1
-                    print('Reconstruction for ResBlock {}'.format(name), qlayer_count)
-                    if ignore_count > 0:
-                        ignore_count -= 1
-                        continue
-                    block_reconstruction_two_input(qnn, module, **kwargs)
-            elif isinstance(module, BasicTransformerBlock):
-                pass_block -= 1
-                if pass_block < 0 :
-                    qlayer_count = 1
-                    print('Reconstruction for BasicTransformerBlock {}'.format(name), qlayer_count)
-                    if ignore_count > 0:
-                        ignore_count -= 1
-                        continue
-                    block_reconstruction_two_input(qnn, module, **kwargs)
-            else:
-                recon_model(module)
-            if qlayer_count % 10 == 0 and qlayer_count > exist_idx:
-                if qlayer_count == 0:
-                    continue
-                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count)):
-                    continue
-                qnn.set_quant_state(weight_quant=True, act_quant=False)
-                torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
-                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20)):
-                    os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20))
         
     # Start calibration
     print('Start calibration')
-    recon_model(qnn)
-    qnn.set_quant_state(weight_quant=True, act_quant=False)
-    torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd.pth'.format(n_bits_w))
+    trainer = Trainer(qnn, rank ,ignore_count, kwargs)
+    trainer.train()
     destroy_process_group()
+
 
 if __name__ == '__main__':
     mp.spawn(main,args=(4,), nprocs=4)
