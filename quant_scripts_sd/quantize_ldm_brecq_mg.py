@@ -2,7 +2,7 @@ import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1,3,4,5'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3,4,5'
 from taming.models import vqgan
 
 import torch
@@ -240,4 +240,4 @@ def main(rank, world_size):
 
 
 if __name__ == '__main__':
-    mp.spawn(main,args=(4,), nprocs=4)
+    mp.spawn(main,args=(3,), nprocs=3)

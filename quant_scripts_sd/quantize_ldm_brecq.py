@@ -178,15 +178,15 @@ if __name__ == '__main__':
                     block_reconstruction_two_input(qnn, module, **kwargs)
             else:
                 recon_model(module)
-            if qlayer_count % 20 == 0 and qlayer_count > exist_idx:
+            if qlayer_count % 10 == 0 and qlayer_count > exist_idx:
                 if qlayer_count == 0:
                     continue
                 if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count)):
                     continue
                 qnn.set_quant_state(weight_quant=True, act_quant=False)
                 torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
-                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 40)):
-                    os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 40))
+                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20)):
+                    os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20))
         
     # Start calibration
     print('Start calibration')
