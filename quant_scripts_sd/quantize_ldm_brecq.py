@@ -143,6 +143,7 @@ if __name__ == '__main__':
         Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
         """
         global pass_block
+        global ignore_count
         global qlayer_count
         for name, module in model.named_children():
             if isinstance(module, (QuantModule)):
