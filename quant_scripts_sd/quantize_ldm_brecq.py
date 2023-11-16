@@ -2,7 +2,7 @@ import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1,3,4,5'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 from taming.models import vqgan
 
 import torch
