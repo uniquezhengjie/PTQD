@@ -7,7 +7,7 @@ sys.path.append(".")
 sys.path.append('./taming-transformers')
 import argparse
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1,3,4,5'
 import time
 import logging
 
@@ -57,9 +57,9 @@ def get_train_samples(train_loader, num_samples):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_samples', type=int, default=10000)
+    parser.add_argument('--num_samples', type=int, default=50000)
     parser.add_argument('--num_classes', type=int, default=1000)
-    parser.add_argument('--batch_size', default=8, type=int)
+    parser.add_argument('--batch_size', default=16, type=int)
     parser.add_argument('--image_size', default=512, type=int)
     parser.add_argument('--out_dir', default='./generated')
     parser.add_argument("--local_rank", default=os.getenv('LOCAL_RANK', -1), type=int)
@@ -69,13 +69,19 @@ def main():
     args = parser.parse_args()
     print(args)
     # init ddp
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '5696'
-    rank=0
-    local_rank=0
-    # local_rank = args.local_rank
+    # init ddp
+    local_rank = args.local_rank
     torch.cuda.set_device(local_rank)
-    dist.init_process_group(backend='nccl', init_method='env://', rank = 0, world_size = 1)
+    dist.init_process_group(backend='nccl')
+    rank = torch.distributed.get_rank()
+
+    # os.environ['MASTER_ADDR'] = 'localhost'
+    # os.environ['MASTER_PORT'] = '5696'
+    # rank=0
+    # local_rank=0
+    # # local_rank = args.local_rank
+    # torch.cuda.set_device(local_rank)
+    # dist.init_process_group(backend='nccl', init_method='env://', rank = 0, world_size = 1)
     ## for debug, not use ddp
     # rank=0
     # local_rank=0
@@ -94,9 +100,9 @@ def main():
     torch.set_grad_enabled(False)
     device = torch.device("cuda", local_rank)
 
-    ddim_steps = 20
+    ddim_steps = 50
     ddim_eta = 0.0
-    scale = 3.0
+    scale = 7.5
 
     # Load model:
     model = get_model()
@@ -109,7 +115,7 @@ def main():
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps_sd.pth')
+    dataset = DiffusionInputDataset('imagenet_input_50steps_sd.pth')
     data_loader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True) ## each sample is (16,4,32,32)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
@@ -147,12 +153,12 @@ def main():
     setattr(model.model, 'diffusion_model', qnn)
     sampler = DDIMSampler_quantCorrection_imagenet(model, n_bits_w=n_bits_w, n_bits_a=n_bits_a, correct=True)
 
-    out_path = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_sd.npz")
+    out_path = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_sd.npz")
     print("out_path: ",out_path)
     if args.qdecoder:
-        out_path_q = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_sd_qdecoder.npz")
+        out_path_q = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_sd_qdecoder.npz")
     if args.fp32:
-        out_path_fp32 = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_sd_fp32.npz")
+        out_path_fp32 = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_sd_fp32.npz")
     logging.info("sampling...")
     generated_num = torch.tensor(0, device=device)
     if rank == 0:
