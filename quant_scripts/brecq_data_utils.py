@@ -5,7 +5,7 @@ from quant_scripts.brecq_quant_model import QuantModel
 
 
 def save_inp_oup_data(model: QuantModel, layer, cali_images, cali_t, cali_y,
-                      asym: bool = False, act_quant: bool = False, batch_size: int = 32, keep_gpu: bool = True):
+                      asym: bool = False, act_quant: bool = False, batch_size: int = 32, keep_gpu: bool = False):
     """
     Save input data and output data of a particular layer/block over calibration dataset.
 
@@ -37,7 +37,7 @@ def save_inp_oup_data(model: QuantModel, layer, cali_images, cali_t, cali_y,
     return cached_inps, cached_outs
 
 def save_inp_oup_data_block(model: QuantModel, layer: QuantModule, cali_images, cali_t, cali_y,
-                      asym: bool = False, act_quant: bool = False, batch_size: int = 32, keep_gpu: bool = True):
+                      asym: bool = False, act_quant: bool = False, batch_size: int = 32, keep_gpu: bool = False):
     """
     Save input data and output data of a particular layer/block over calibration dataset.
 
@@ -73,7 +73,7 @@ def save_inp_oup_data_block(model: QuantModel, layer: QuantModule, cali_images, 
 
 def save_grad_data(model: QuantModel, layer: QuantModule, cali_images, cali_t, cali_y,
                    damping: float = 1., act_quant: bool = False, batch_size: int = 32,
-                   keep_gpu: bool = True):
+                   keep_gpu: bool = False):
     """
     Save gradient data of a particular layer/block over calibration dataset.
 
