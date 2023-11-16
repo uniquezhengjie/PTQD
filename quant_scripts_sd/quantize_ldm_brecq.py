@@ -94,6 +94,7 @@ if __name__ == '__main__':
     qnn.set_first_last_layer_to_8bit()
 
     device = next(qnn.parameters()).device
+    print('device: ', device)
 
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
