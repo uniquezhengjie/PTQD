@@ -3,7 +3,7 @@ sys.path.append(".")
 sys.path.append('./taming-transformers')
 from taming.models import vqgan
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '3'
 
 import torch
 import torch.nn as nn
@@ -137,13 +137,18 @@ if __name__ == '__main__':
                                                 unconditional_guidance_scale=scale,
                                                 unconditional_conditioning=uc, 
                                                 eta=ddim_eta)
-                if (idx+1) % save_len == 0:
-                    import ldm.globalvar as globalvar
-                    data_error_t = globalvar.getList()
-                    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, idx))
-                    globalvar.emptyList()
+    #             if (idx+1) % save_len == 0:
+    #                 import ldm.globalvar as globalvar
+    #                 data_error_t = globalvar.getList()
+    #                 torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, idx))
+    #                 globalvar.emptyList()
+
+    # import ldm.globalvar as globalvar
+    # data_error_t = globalvar.getList()
+    # torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, 'final'))
+    # globalvar.emptyList()
 
     import ldm.globalvar as globalvar
     data_error_t = globalvar.getList()
-    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, 'final'))
+    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps))
     globalvar.emptyList()

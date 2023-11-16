@@ -2,7 +2,7 @@ import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-os.environ['CUDA_VISIBLE_DEVICES']='0'
+os.environ['CUDA_VISIBLE_DEVICES']='3'
 from taming.models import vqgan
 
 import torch
@@ -110,7 +110,7 @@ if __name__ == '__main__':
         _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
 
     # Kwargs for weight rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=2500, weight=0.01, asym=True,
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, weight=0.01, asym=True,
                     b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=8)
 
     pass_block = 0
