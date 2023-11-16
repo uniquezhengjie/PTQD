@@ -80,6 +80,7 @@ if __name__ == '__main__':
     model = model.model.diffusion_model
     model.cuda()
     model.eval()
+    batch_size = 8
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
     aq_params = {'n_bits': n_bits_a, 'channel_wise': False, 'scale_method': 'mse', 'leaf_param': True}
@@ -96,7 +97,7 @@ if __name__ == '__main__':
     from torch.utils.data import DataLoader
 
     dataset = DiffusionInputDataset('imagenet_input_20steps_sd.pth')
-    data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
+    data_loader = DataLoader(dataset=dataset, batch_size=batch_size, shuffle=True)
     
     cali_images, cali_t, cali_y = get_train_samples(data_loader, num_samples=1024)
     # Initialize weight quantization parameters
@@ -104,11 +105,11 @@ if __name__ == '__main__':
 
     print('First run to init model...')
     with torch.no_grad():
-        _ = qnn(cali_images[:1].to(device),cali_t[:1].to(device),cali_y[:1].to(device))
+        _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
 
     # Kwargs for weight rounding calibration
     kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=50000, weight=0.01, asym=True,
-                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=1)
+                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size)
 
     pass_block = 0
     def recon_model(model: nn.Module):

@@ -78,12 +78,12 @@ if __name__ == '__main__':
 
     ## save all_samples
     # 为了提供给decoder模型做量化
-    torch.save(all_samples, 'imagenet_samples_ddim_{}steps_{}_{}_sd.pth'.format(ddim_steps,idx,idx+100))
+    torch.save(all_samples, 'imagenet_samples_ddim_{}steps_sd.pth'.format(ddim_steps))
     # sys.exit(0)
     ## save diffusion input data
     import ldm.globalvar as globalvar   
     input_list = globalvar.getInputList()
-    torch.save(input_list, 'imagenet_input_{}steps_{}_{}_sd.pth'.format(ddim_steps,idx,idx+100))
+    torch.save(input_list, 'imagenet_input_{}steps_sd.pth'.format(ddim_steps))
     globalvar.emptyInputList()
     all_samples = list()
     # sys.exit(0)
