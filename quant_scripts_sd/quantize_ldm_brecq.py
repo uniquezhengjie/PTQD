@@ -22,8 +22,10 @@ from quant_scripts.brecq_quant_model import QuantModel
 from quant_scripts.brecq_quant_layer import QuantModule
 from quant_scripts.brecq_layer_recon import layer_reconstruction
 from quant_scripts.brecq_block_recon import block_reconstruction_single_input, block_reconstruction_two_input
+from quant_scripts.brecq_adaptive_rounding import AdaRoundQuantizer
 
 from tqdm import tqdm
+import copy
 
 n_bits_w = 8
 n_bits_a = 8
@@ -109,7 +111,29 @@ if __name__ == '__main__':
 
     # Kwargs for weight rounding calibration
     kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, weight=0.01, asym=True,
-                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size)
+                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size*4)
+    
+    layer_len = 0
+    for name, module in qnn.named_modules():
+        if isinstance(module, QuantModule) and module.ignore_reconstruction is False:
+            layer_len += 1
+            module.weight_quantizer.soft_targets = False
+            module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
+    print("total layer len = ", layer_len)
+    ignore_count = 0
+    for i in range(1, layer_len+1):
+        if os.path.exists('quantw8_ldm_brecq_sd_{}.pth'.format(str(i))):
+            ignore_count = i
+    exist_idx = copy.deepcopy(ignore_count)
+
+    if ignore_count == layer_len:
+        sys.exit(0)
+
+    print('load_state_dict layer', ignore_count)
+    ckpt = torch.load('quantw8_ldm_brecq_sd_{}.pth'.format(str(ignore_count)), map_location='cpu') ## replace first step checkpoint here
+    qnn.load_state_dict(ckpt, False)
+    qnn.set_quant_state(True, False)
+    del ckpt
 
     pass_block = 0
     qlayer_count = 0
@@ -127,6 +151,9 @@ if __name__ == '__main__':
                 else:
                     qlayer_count += 1
                     print('Reconstruction for layer {}'.format(name), qlayer_count)
+                    if ignore_count > 0:
+                        ignore_count -= 1
+                        continue
                     layer_reconstruction(qnn, module, **kwargs)
 
             elif isinstance(module, ResBlock):
@@ -134,15 +161,30 @@ if __name__ == '__main__':
                 if pass_block < 0 :
                     qlayer_count += 1
                     print('Reconstruction for ResBlock {}'.format(name), qlayer_count)
+                    if ignore_count > 0:
+                        ignore_count -= 1
+                        continue
                     block_reconstruction_two_input(qnn, module, **kwargs)
             elif isinstance(module, BasicTransformerBlock):
                 pass_block -= 1
                 if pass_block < 0 :
                     qlayer_count += 1
                     print('Reconstruction for BasicTransformerBlock {}'.format(name), qlayer_count)
+                    if ignore_count > 0:
+                        ignore_count -= 1
+                        continue
                     block_reconstruction_two_input(qnn, module, **kwargs)
             else:
                 recon_model(module)
+            if qlayer_count % 20 == 0 and qlayer_count > exist_idx:
+                if qlayer_count == 0:
+                    continue
+                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count)):
+                    continue
+                qnn.set_quant_state(weight_quant=True, act_quant=False)
+                torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
+                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 40)):
+                    os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 40))
         
     # Start calibration
     print('Start calibration')
