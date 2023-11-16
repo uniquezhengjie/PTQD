@@ -92,7 +92,8 @@ def count_recon_times(model):
         else:
             count_recon_times(module)
 
-if __name__ == '__main__':
+def main(rank, world_size):
+    ddp_setup(rank, world_size)
     model = get_model()
     model = model.model.diffusion_model
     model.cuda()
@@ -128,7 +129,7 @@ if __name__ == '__main__':
 
     # Kwargs for weight rounding calibration
     kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=500, weight=0.01, asym=True,
-                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size)
+                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size*64)
     
     layer_len = 0
     for name, module in qnn.named_modules():
@@ -138,7 +139,7 @@ if __name__ == '__main__':
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
     print("total layer len = ", layer_len)
     ignore_count = 0
-    for i in range(1, layer_len1):
+    for i in range(1, layer_len):
         if os.path.exists('quantw8_ldm_brecq_sd_{}.pth'.format(str(i))):
             ignore_count = i
     exist_idx = copy.deepcopy(ignore_count)
@@ -195,18 +196,22 @@ if __name__ == '__main__':
                     block_reconstruction_two_input(qnn, module, **kwargs)
             else:
                 recon_model(module)
-            if qlayer_count % 20 == 0 and qlayer_count > exist_idx:
+            if qlayer_count % 10 == 0 and qlayer_count > exist_idx:
                 if qlayer_count == 0:
                     continue
                 if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count)):
                     continue
                 qnn.set_quant_state(weight_quant=True, act_quant=False)
                 torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
-                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 40)):
-                    os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 40))
+                if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20)):
+                    os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20))
         
     # Start calibration
     print('Start calibration')
     recon_model(qnn)
     qnn.set_quant_state(weight_quant=True, act_quant=False)
     torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd.pth'.format(n_bits_w))
+    destroy_process_group()
+
+if __name__ == '__main__':
+    mp.spawn(main,args=(4,), nprocs=4)
