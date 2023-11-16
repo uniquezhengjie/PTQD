@@ -95,8 +95,8 @@ if __name__ == '__main__':
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
-    data_loader = DataLoader(dataset=dataset, batch_size=8, shuffle=True)
+    dataset = DiffusionInputDataset('imagenet_input_20steps_sd.pth')
+    data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=True)
     
     cali_images, cali_t, cali_y = get_train_samples(data_loader, num_samples=1024)
     # Initialize weight quantization parameters
@@ -104,11 +104,11 @@ if __name__ == '__main__':
 
     print('First run to init model...')
     with torch.no_grad():
-        _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
+        _ = qnn(cali_images[:1].to(device),cali_t[:1].to(device),cali_y[:1].to(device))
 
     # Kwargs for weight rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, weight=0.01, asym=True,
-                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=8)
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=50000, weight=0.01, asym=True,
+                    b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=1)
 
     pass_block = 0
     def recon_model(model: nn.Module):
@@ -142,4 +142,4 @@ if __name__ == '__main__':
     print('Start calibration')
     recon_model(qnn)
     qnn.set_quant_state(weight_quant=True, act_quant=False)
-    torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq.pth'.format(n_bits_w))
+    torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd.pth'.format(n_bits_w))

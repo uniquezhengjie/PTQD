@@ -41,9 +41,9 @@ if __name__ == '__main__':
     # n_samples_per_class = 6
     n_samples_per_class = 1
 
-    ddim_steps = 20
-    ddim_eta = 1.0
-    scale = 3.0
+    ddim_steps = 50
+    ddim_eta = 0.0
+    scale = 7.5
 
     datasets = []
     for c in classes:

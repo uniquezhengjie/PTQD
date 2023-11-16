@@ -23,6 +23,8 @@ from quant_scripts.brecq_quant_model import QuantModel
 from quant_scripts.brecq_quant_layer import QuantModule
 from quant_scripts.brecq_adaptive_rounding import AdaRoundQuantizer
 from copy import deepcopy
+from imagenet_2012_labels import label_to_name
+
 n_bits_w = 8
 n_bits_a = 8
 
@@ -38,8 +40,8 @@ def load_model_from_config(config, ckpt):
 
 
 def get_model():
-    config = OmegaConf.load("configs/latent-diffusion/cin256-v2.yaml")  
-    model = load_model_from_config(config, "models/ldm/cin256-v2/model.ckpt")
+    config = OmegaConf.load("configs/stable-diffusion/v1-inference.yaml")  
+    model = load_model_from_config(config, "models/ldm/stable-diffusion-v1/model.ckpt")
     return model
 
 def get_train_samples(train_loader, num_samples):
@@ -55,10 +57,10 @@ def get_train_samples(train_loader, num_samples):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--num_samples', type=int, default=50000)
+    parser.add_argument('--num_samples', type=int, default=10000)
     parser.add_argument('--num_classes', type=int, default=1000)
-    parser.add_argument('--batch_size', default=4, type=int)
-    parser.add_argument('--image_size', default=256, type=int)
+    parser.add_argument('--batch_size', default=8, type=int)
+    parser.add_argument('--image_size', default=512, type=int)
     parser.add_argument('--out_dir', default='./generated')
     parser.add_argument("--local_rank", default=os.getenv('LOCAL_RANK', -1), type=int)
     parser.add_argument("--resume", action='store_true')
@@ -86,7 +88,7 @@ def main():
         torch.manual_seed(0 + rank)
 
     if args.qdecoder:
-        fx_graph_mode_model_file_path = 'quantized_decoder/decoder_fx_graph_mode_quantized.pth'
+        fx_graph_mode_model_file_path = 'quantized_decoder/decoder_fx_graph_mode_quantized_sd.pth'
         quantized_modelFS = torch.jit.load(fx_graph_mode_model_file_path)
 
     torch.set_grad_enabled(False)
@@ -107,7 +109,7 @@ def main():
     from quant_scripts.quant_dataset import DiffusionInputDataset
     from torch.utils.data import DataLoader
 
-    dataset = DiffusionInputDataset('imagenet_input_20steps.pth')
+    dataset = DiffusionInputDataset('imagenet_input_20steps_sd.pth')
     data_loader = DataLoader(dataset=dataset, batch_size=args.batch_size, shuffle=True) ## each sample is (16,4,32,32)
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
@@ -138,19 +140,19 @@ def main():
     # does not get involved in further computation
     qnn.disable_network_output_quantization()
 
-    ckpt = torch.load('quantw{}a{}_ldm_brecq.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
+    ckpt = torch.load('quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a), map_location='cpu')
     qnn.load_state_dict(ckpt)
     qnn.cuda()
     qnn.eval()
     setattr(model.model, 'diffusion_model', qnn)
     sampler = DDIMSampler_quantCorrection_imagenet(model, n_bits_w=n_bits_w, n_bits_a=n_bits_a, correct=True)
 
-    out_path = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1103.npz")
+    out_path = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_sd.npz")
     print("out_path: ",out_path)
     if args.qdecoder:
-        out_path_q = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1103_qdecoder.npz")
+        out_path_q = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_sd_qdecoder.npz")
     if args.fp32:
-        out_path_fp32 = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1103_fp32.npz")
+        out_path_fp32 = os.path.join(args.out_dir, f"brecq_w{n_bits_w}a{n_bits_a}_{args.num_samples}steps{ddim_steps}eta{ddim_eta}scale{scale}_1109_sd_fp32.npz")
     logging.info("sampling...")
     generated_num = torch.tensor(0, device=device)
     if rank == 0:
@@ -202,20 +204,22 @@ def main():
                                      size=(args.batch_size,),
                                      device=device)
         print(class_labels)
-        uc = model.get_learned_conditioning(
-            {model.cond_stage_key: torch.tensor(n_samples_per_class*[1000]).to(model.device)}
-            )
+        uc = model.get_learned_conditioning(n_samples_per_class * [""])
+        datasets = []
+        for c in class_labels:
+            name = label_to_name(c).split(',')[0]
+            datasets.append("This is a photo of a {}".format(name))
         
-        for class_label in class_labels:
+        for idx, class_label in enumerate(datasets):
             t0 = time.time()
-            xc = torch.tensor(n_samples_per_class*[class_label]).to(model.device)
-            c = model.get_learned_conditioning({model.cond_stage_key: xc.to(model.device)})
+            xc = torch.tensor(n_samples_per_class*[class_labels[idx]]).to(model.device)
+            c = model.get_learned_conditioning(n_samples_per_class*[class_label])
             
             if args.fp32:
                 samples_ddim_f32, _ = sampler_fp32.sample(S=ddim_steps,
                                                 conditioning=c,
                                                 batch_size=n_samples_per_class,
-                                                shape=[3, 64, 64],
+                                                shape=[4, 64, 64],
                                                 verbose=False,
                                                 unconditional_guidance_scale=scale,
                                                 unconditional_conditioning=uc, 
@@ -233,7 +237,7 @@ def main():
             samples_ddim, _ = sampler.sample(S=ddim_steps,
                                             conditioning=c,
                                             batch_size=n_samples_per_class,
-                                            shape=[3, 64, 64],
+                                            shape=[4, 64, 64],
                                             verbose=False,
                                             unconditional_guidance_scale=scale,
                                             unconditional_conditioning=uc, 
