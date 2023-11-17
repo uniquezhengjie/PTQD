@@ -154,7 +154,7 @@ if __name__ == '__main__':
     # does not get involved in further computation
     qnn.disable_network_output_quantization()
     # Kwargs for activation rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=20000, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=batch_size)
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=batch_size)
     recon_model(qnn)
     qnn.set_quant_state(weight_quant=True, act_quant=True)
     torch.save(qnn.state_dict(), 'quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a))
