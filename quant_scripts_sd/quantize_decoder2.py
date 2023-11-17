@@ -4,11 +4,8 @@ sys.path.append('./taming-transformers')
 import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 # from taming.models import vqgan
-import os
-import numpy as np
 
 import torch
-torch.cuda.manual_seed(3407)
 import torch.nn as nn
 from omegaconf import OmegaConf
 
