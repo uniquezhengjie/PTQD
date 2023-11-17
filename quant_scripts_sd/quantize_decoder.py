@@ -1,6 +1,6 @@
 import os
 import numpy as np
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '5'
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
