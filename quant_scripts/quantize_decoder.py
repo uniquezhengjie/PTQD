@@ -140,7 +140,7 @@ if __name__ == '__main__':
     # quantized_modelFS.to_folder("quantized_decoder","dtest")
     # torch.save(quantized_modelFS.state_dict(), "quantized_decoder.p")
     # torch.jit.save(torch.jit.script(quantized_modelFS), 'quantized_decoder/decoder_fx_graph_mode_quantized.pth')
-    torch.jit.save(torch.jit.script(quantized_modelFS), 'quantized_decoder/decoder_fx_graph_mode_quantized_100step.pth')
+    # torch.jit.save(torch.jit.script(quantized_modelFS), 'quantized_decoder/decoder_fx_graph_mode_quantized_100step.pth')
     print("Size of model after quantization")
     print_size_of_model(quantized_modelFS)
     # model.first_stage_model = quantized_modelFS

@@ -67,12 +67,12 @@ if __name__ == '__main__':
 
     data_path = 'imagenet_samples_ddim_50steps_sd.pth'
     data_list = torch.load(data_path, map_location='cpu')
-
+    print('load data: ', data_path)
     model = get_model()
     modelFS = model.first_stage_model
     modelFS.to('cpu')
     modelFS.eval()
-
+    print('modelFS')
     qconfig = get_default_qconfig("onednn")  # reduce_range=False onednn and qnnpack
     # qconfig = get_default_qconfig("x86")
     # qconfig = torch.ao.quantization.float16_static_qconfig
