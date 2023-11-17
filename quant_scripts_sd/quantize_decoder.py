@@ -1,11 +1,11 @@
-import sys, time
+import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-import numpy as np
-os.environ['CUDA_VISIBLE_DEVICES'] = '5'
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 # from taming.models import vqgan
+import os
+import numpy as np
 
 import torch
 torch.cuda.manual_seed(3407)
