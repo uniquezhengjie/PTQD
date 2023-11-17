@@ -2,8 +2,6 @@ import os
 import numpy as np
 os.environ['CUDA_VISIBLE_DEVICES'] = '5'
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
 
 import sys, time
 sys.path.append(".")
@@ -19,25 +17,7 @@ from ldm.util import instantiate_from_config
 # from ldm.models.diffusion.ddpm import DDPM
 
 import numpy as np 
-from PIL import Image
-from einops import rearrange
-from torchvision.utils import make_grid
 
-from torch.ao.quantization import get_default_qconfig, QConfigMapping,get_default_qconfig_mapping
-from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx, fuse_fx
-# from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
-
-# Set up warnings
-import warnings
-warnings.filterwarnings(
-    action='ignore',
-    category=DeprecationWarning,
-    module=r'.*'
-)
-warnings.filterwarnings(
-    action='default',
-    module=r'torch.ao.quantization'
-)
 
 # Specify random seed for repeatable results
 torch.manual_seed(191009)
