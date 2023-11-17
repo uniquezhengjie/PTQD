@@ -44,8 +44,8 @@ def block_reconstruction_two_input(model: QuantModel, block, cali_images:torch.T
         for name, module in block.named_modules():
             if isinstance(module, QuantModule):
                 module.set_quant_state(True, act_quant)
-                module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode=round_mode,
-                                                            weight_tensor=module.org_weight.data)
+                # module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode=round_mode,
+                #                                             weight_tensor=module.org_weight.data)
                 module.weight_quantizer.soft_targets = True
 
         # Set up optimizer

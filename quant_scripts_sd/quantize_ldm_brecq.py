@@ -2,7 +2,7 @@ import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 from taming.models import vqgan
 
 import torch
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     model = model.model.diffusion_model
     model.cuda()
     model.eval()
-    batch_size = 4
+    batch_size = 1
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
     aq_params = {'n_bits': n_bits_a, 'channel_wise': False, 'scale_method': 'mse', 'leaf_param': True}
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     print('First run to init model...')
     with torch.no_grad():
-        _ = qnn(cali_images[:32].to(device),cali_t[:32].to(device),cali_y[:32].to(device))
+        _ = qnn(cali_images[:4].to(device),cali_t[:4].to(device),cali_y[:4].to(device))
 
     # Kwargs for weight rounding calibration
     kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=15000, weight=0.01, asym=True,
@@ -118,6 +118,8 @@ if __name__ == '__main__':
     for name, module in qnn.named_modules():
         if isinstance(module, QuantModule) and module.ignore_reconstruction is False:
             layer_len += 1
+            if layer_len>60:
+                break
             module.weight_quantizer.soft_targets = False
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
     print("total layer len = ", layer_len)
@@ -129,7 +131,7 @@ if __name__ == '__main__':
 
     if ignore_count == layer_len:
         sys.exit(0)
-
+    ignore_count = 40
     if exist_idx != 0:
         print('load_state_dict layer', ignore_count)
         ckpt = torch.load('quantw8_ldm_brecq_sd_{}.pth'.format(str(ignore_count)), map_location='cpu') ## replace first step checkpoint here
