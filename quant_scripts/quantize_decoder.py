@@ -57,7 +57,7 @@ def get_model():
     return model
 
 if __name__ == '__main__':
-    num_calibration_batches = 1
+    num_calibration_batches = 1000
     # config = "tiny_optimizedSD/v1-inference.yaml"
     # ckpt = "/home/reexen/projects/stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt"
     # config = OmegaConf.load(f"{config}")
