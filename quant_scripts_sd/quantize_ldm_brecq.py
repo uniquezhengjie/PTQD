@@ -47,7 +47,10 @@ def get_model():
 
 def get_train_samples(train_loader, num_samples):
     image_data, t_data, y_data = [], [], []
+    count = 0
     for (image, t, y) in train_loader:
+        count += 1
+        print(count)
         image_data.append(image)
         t_data.append(t)
         y_data.append(y)
