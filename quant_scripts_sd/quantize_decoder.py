@@ -16,7 +16,7 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 
 from ldm.util import instantiate_from_config
-from ldm.models.diffusion.ddpm import DDPM
+# from ldm.models.diffusion.ddpm import DDPM
 
 import numpy as np 
 from PIL import Image
