@@ -1,13 +1,8 @@
-import os
-import numpy as np
-os.environ['CUDA_VISIBLE_DEVICES'] = '5'
-import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-
-import sys, time
+import sys
 sys.path.append(".")
 sys.path.append('./taming-transformers')
+import os
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 # from taming.models import vqgan
 
 import torch
