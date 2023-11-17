@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 import sys, time
 sys.path.append(".")
 sys.path.append('./taming-transformers')
-from taming.models import vqgan
+# from taming.models import vqgan
 
 import torch
 torch.cuda.manual_seed(3407)
@@ -25,7 +25,7 @@ from torchvision.utils import make_grid
 
 from torch.ao.quantization import get_default_qconfig, QConfigMapping,get_default_qconfig_mapping
 from torch.ao.quantization.quantize_fx import prepare_fx, convert_fx, fuse_fx
-from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
+# from taming.modules.vqvae.quantize import VectorQuantizer2 as VectorQuantizer
 
 # Set up warnings
 import warnings
