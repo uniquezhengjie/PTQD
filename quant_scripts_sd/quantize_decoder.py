@@ -65,7 +65,7 @@ def get_model():
 if __name__ == '__main__':
     num_calibration_batches = 1000
 
-    data_path = 'imagenet_samples_ddim_20steps_sd.pth'
+    data_path = 'imagenet_samples_ddim_50steps_sd.pth'
     data_list = torch.load(data_path, map_location='cpu')
 
     model = get_model()
@@ -110,5 +110,5 @@ if __name__ == '__main__':
     img = 255. * rearrange(x_samples_ddim, 'c h w -> h w c').cpu().numpy()
     print(img.astype(np.uint8).min(),img.astype(np.uint8).max())
     image_to_save = Image.fromarray(img.astype(np.uint8))
-    image_to_save.save("quant_decoder1.jpg")
+    image_to_save.save("quant_decoder1_sd.jpg")
     
