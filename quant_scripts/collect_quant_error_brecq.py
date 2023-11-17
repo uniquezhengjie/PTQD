@@ -124,8 +124,8 @@ if __name__ == '__main__':
             for idx, class_label in enumerate(classes):
                 # idx = i + 1
                 print(f"rendering {n_samples_per_class} examples of class '{class_label}' in {ddim_steps} steps and using s={scale:.2f}. idx={idx}")
-                if os.path.exists('generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, (idx//save_len + 1)*save_len-1)):
-                    continue
+                # if os.path.exists('generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, (idx//save_len + 1)*save_len-1)):
+                #     continue
                 xc = torch.tensor(n_samples_per_class*[class_label])
                 c = model.get_learned_conditioning({model.cond_stage_key: xc.to(model.device)})
                 
