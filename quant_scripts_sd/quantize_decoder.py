@@ -57,7 +57,7 @@ def get_model():
     return model
 
 if __name__ == '__main__':
-    num_calibration_batches = 1
+    num_calibration_batches = 1000
 
     data_path = 'imagenet_samples_ddim_50steps_sd.pth'
     data_list = torch.load(data_path, map_location='cpu')
