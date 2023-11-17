@@ -66,8 +66,8 @@ def layer_reconstruction(model: QuantModel, layer: QuantModule, cali_images:torc
 
     if not act_quant:
         # Replace weight quantizer to AdaRoundQuantizer
-        # layer.weight_quantizer = AdaRoundQuantizer(uaq=layer.weight_quantizer, round_mode=round_mode,
-        #                                            weight_tensor=layer.org_weight.data)
+        layer.weight_quantizer = AdaRoundQuantizer(uaq=layer.weight_quantizer, round_mode=round_mode,
+                                                   weight_tensor=layer.org_weight.data)
         layer.weight_quantizer.soft_targets = True
 
         # Set up optimizer
