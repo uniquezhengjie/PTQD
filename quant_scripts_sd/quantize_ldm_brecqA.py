@@ -25,6 +25,7 @@ from quant_scripts.brecq_block_recon import block_reconstruction_single_input, b
 from quant_scripts.brecq_adaptive_rounding import AdaRoundQuantizer
 
 from tqdm import tqdm
+import copy
 
 n_bits_w = 8
 n_bits_a = 8
@@ -77,6 +78,8 @@ def count_recon_times(model):
             count_recon_times(module)
 
 if __name__ == '__main__':
+    if os.path.exists('quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a)):
+        sys.exit(0)
     model = get_model()
     model = model.model.diffusion_model
     model.cuda()
@@ -111,41 +114,82 @@ if __name__ == '__main__':
                     b_range=(20, 2), warmup=0.2, act_quant=False, opt_mode='mse', batch_size=batch_size)
 
     pass_block = 0
+    qlayer_count = 0
     def recon_model(model: nn.Module):
         """
         Block reconstruction. For the first and last layers, we can only apply layer reconstruction.
         """
         global pass_block
+        global ignore_count
+        global qlayer_count
         for name, module in model.named_children():
             if isinstance(module, (QuantModule)):
                 if module.ignore_reconstruction is True:
                     print('Ignore reconstruction of layer {}'.format(name))
                     continue
                 else:
-                    print('Reconstruction for layer {}'.format(name))
+                    qlayer_count += 1
+                    print('Reconstruction for layer {}'.format(name), qlayer_count)
+                    if ignore_count > 0:
+                        ignore_count -= 1
+                        continue
                     layer_reconstruction(qnn, module, **kwargs)
 
             elif isinstance(module, ResBlock):
                 pass_block -= 1
                 if pass_block < 0 :
-                    print('Reconstruction for ResBlock {}'.format(name))
+                    qlayer_count += 1
+                    print('Reconstruction for ResBlock {}'.format(name), qlayer_count)
+                    if ignore_count > 0:
+                        ignore_count -= 1
+                        continue
                     block_reconstruction_two_input(qnn, module, **kwargs)
             elif isinstance(module, BasicTransformerBlock):
                 pass_block -= 1
                 if pass_block < 0 :
-                    print('Reconstruction for BasicTransformerBlock {}'.format(name))
+                    qlayer_count += 1
+                    print('Reconstruction for BasicTransformerBlock {}'.format(name), qlayer_count)
+                    if ignore_count > 0:
+                        ignore_count -= 1
+                        continue
                     block_reconstruction_two_input(qnn, module, **kwargs)
             else:
                 recon_model(module)
-        
+
+            if qlayer_count % 10 == 0 and qlayer_count > exist_idx:
+                if qlayer_count == 0:
+                    continue
+                if os.path.exists('quantw{}a{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, n_bits_a, qlayer_count)):
+                    continue
+                qnn.set_quant_state(weight_quant=True, act_quant=False)
+                print('start save weights: ', 'quantw{}a{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, n_bits_a, qlayer_count))
+                torch.save(qnn.state_dict(), 'quantw{}a{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, n_bits_a, qlayer_count))
+                if os.path.exists('quantw{}a{}_ldm_brecq_sdd_{}.pth'.format(n_bits_w, n_bits_a, qlayer_count - 20)):
+                    os.remove('quantw{}a{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, n_bits_a, qlayer_count - 20))
+    
+    count_recon_times()
+    print("count_recon_times: ", cnt)
     # Start calibration
     for name, module in qnn.named_modules():
         if isinstance(module, QuantModule) and module.ignore_reconstruction is False:
             module.weight_quantizer.soft_targets = False
             module.weight_quantizer = AdaRoundQuantizer(uaq=module.weight_quantizer, round_mode='learned_hard_sigmoid', weight_tensor=module.org_weight.data)
 
-    ckpt = torch.load('quantw{}_ldm_brecq_sd.pth'.format(n_bits_w), map_location='cpu') ## replace first step checkpoint here
-    qnn.load_state_dict(ckpt, False)
+    ignore_count = 0
+    for i in range(1, cnt+1):
+        if os.path.exists('quantw{}a{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, n_bits_a, str(i))):
+            ignore_count = i
+    exist_idx = copy.deepcopy(ignore_count)
+
+    if exist_idx != 0:
+        print('load_state_dict layer', ignore_count)
+        ckpt = torch.load('quantw{}a{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, n_bits_a, str(ignore_count)), map_location='cpu') ## replace first step checkpoint here
+        qnn.load_state_dict(ckpt, False)
+        qnn.set_quant_state(True, True)
+        del ckpt
+    else:
+        ckpt = torch.load('quantw{}_ldm_brecq_sd.pth'.format(n_bits_w), map_location='cpu') ## replace first step checkpoint here
+        qnn.load_state_dict(ckpt, False)
 
     qnn.set_quant_state(True, True)
     with torch.no_grad():
@@ -154,7 +198,7 @@ if __name__ == '__main__':
     # does not get involved in further computation
     qnn.disable_network_output_quantization()
     # Kwargs for activation rounding calibration
-    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=10000, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=batch_size)
+    kwargs = dict(cali_images=cali_images, cali_t=cali_t, cali_y=cali_y, iters=5000, act_quant=True, opt_mode='mse', lr=4e-4, p=2.4, batch_size=batch_size)
     recon_model(qnn)
     qnn.set_quant_state(weight_quant=True, act_quant=True)
     torch.save(qnn.state_dict(), 'quantw{}a{}_ldm_brecq_sd.pth'.format(n_bits_w, n_bits_a))

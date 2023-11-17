@@ -80,19 +80,20 @@ def count_recon_times(model):
 if __name__ == '__main__':
     model = get_model()
     model = model.model.diffusion_model
-    model.cuda()
+    # model.cuda()
     model.eval()
     batch_size = 4
     
     wq_params = {'n_bits': n_bits_w, 'channel_wise': False, 'scale_method': 'mse'}
     aq_params = {'n_bits': n_bits_a, 'channel_wise': False, 'scale_method': 'mse', 'leaf_param': True}
     qnn = QuantModel(model=model, weight_quant_params=wq_params, act_quant_params=aq_params)
-    qnn.cuda()
+    # qnn.cuda()
     qnn.eval()
 
     print('Setting the first and the last layer to 8-bit')
     qnn.set_first_last_layer_to_8bit()
-
+    count_recon_times(qnn)
+    print(cnt)
     device = next(qnn.parameters()).device
     print('device: ', device)
 
@@ -126,9 +127,6 @@ if __name__ == '__main__':
         if os.path.exists('quantw8_ldm_brecq_sd_{}.pth'.format(str(i))):
             ignore_count = i
     exist_idx = copy.deepcopy(ignore_count)
-
-    if ignore_count == layer_len:
-        sys.exit(0)
 
     if exist_idx != 0:
         print('load_state_dict layer', ignore_count)
