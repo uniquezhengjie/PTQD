@@ -111,7 +111,7 @@ if __name__ == '__main__':
     ddim_steps = 100
     ddim_eta = 1.0
     scale = 1.5
-    save_len = 50
+    save_len = 100
 
     all_samples = list()
 
@@ -124,8 +124,8 @@ if __name__ == '__main__':
             for idx, class_label in enumerate(classes):
                 # idx = i + 1
                 print(f"rendering {n_samples_per_class} examples of class '{class_label}' in {ddim_steps} steps and using s={scale:.2f}. idx={idx}")
-                # if os.path.exists('generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, (idx//save_len + 1)*save_len-1)):
-                #     continue
+                if os.path.exists('generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, (idx//save_len + 1)*save_len-1)):
+                    continue
                 xc = torch.tensor(n_samples_per_class*[class_label])
                 c = model.get_learned_conditioning({model.cond_stage_key: xc.to(model.device)})
                 
@@ -137,18 +137,18 @@ if __name__ == '__main__':
                                                 unconditional_guidance_scale=scale,
                                                 unconditional_conditioning=uc, 
                                                 eta=ddim_eta)
-    #             if (idx+1) % save_len == 0:
-    #                 import ldm.globalvar as globalvar
-    #                 data_error_t = globalvar.getList()
-    #                 torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, idx))
-    #                 globalvar.emptyList()
-
-    # import ldm.globalvar as globalvar
-    # data_error_t = globalvar.getList()
-    # torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, 'final'))
-    # globalvar.emptyList()
+                if (idx+1) % save_len == 0:
+                    import ldm.globalvar as globalvar
+                    data_error_t = globalvar.getList()
+                    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, idx))
+                    globalvar.emptyList()
 
     import ldm.globalvar as globalvar
     data_error_t = globalvar.getList()
-    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps))
+    torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}_{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps, 'final'))
     globalvar.emptyList()
+
+    # import ldm.globalvar as globalvar
+    # data_error_t = globalvar.getList()
+    # torch.save(data_error_t, 'generated/data_error_t_w{}a{}_scale{}_eta{}_step{}.pth'.format(n_bits_w, n_bits_a, scale, ddim_eta, ddim_steps))
+    # globalvar.emptyList()
