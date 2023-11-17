@@ -167,7 +167,7 @@ if __name__ == '__main__':
                 if os.path.exists('quantw{}a{}_ldm_brecq_sdd_{}.pth'.format(n_bits_w, n_bits_a, qlayer_count - 20)):
                     os.remove('quantw{}a{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, n_bits_a, qlayer_count - 20))
     
-    count_recon_times()
+    count_recon_times(qnn)
     print("count_recon_times: ", cnt)
     # Start calibration
     for name, module in qnn.named_modules():
