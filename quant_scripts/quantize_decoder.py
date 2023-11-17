@@ -11,7 +11,6 @@ sys.path.append('./taming-transformers')
 # from taming.models import vqgan
 
 import torch
-torch.cuda.manual_seed(3407)
 import torch.nn as nn
 from omegaconf import OmegaConf
 
