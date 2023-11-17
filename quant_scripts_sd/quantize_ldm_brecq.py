@@ -146,6 +146,7 @@ if __name__ == '__main__':
         global pass_block
         global ignore_count
         global qlayer_count
+        ignore_count -= 1
         for name, module in model.named_children():
             if isinstance(module, (QuantModule)):
                 if module.ignore_reconstruction is True:
