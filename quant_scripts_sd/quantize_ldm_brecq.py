@@ -146,7 +146,6 @@ if __name__ == '__main__':
         global pass_block
         global ignore_count
         global qlayer_count
-        ignore_count -= 1
         for name, module in model.named_children():
             if isinstance(module, (QuantModule)):
                 if module.ignore_reconstruction is True:
@@ -186,6 +185,7 @@ if __name__ == '__main__':
                 if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count)):
                     continue
                 qnn.set_quant_state(weight_quant=True, act_quant=False)
+                print('start save weights: ', 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
                 torch.save(qnn.state_dict(), 'quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count))
                 if os.path.exists('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20)):
                     os.remove('quantw{}_ldm_brecq_sd_{}.pth'.format(n_bits_w, qlayer_count - 20))
